@@ -61,7 +61,9 @@
 
                 <!-- Formulaire d'Inscription -->
                 <div id="register-form-wrapper" style="display: none;">
-                    <button id="btn-back-to-login" type="button" style="background: none; border: none; color: var(--primary-color); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; margin-bottom: 15px; padding: 0;">← Retour à la connexion</button>
+                    <button id="btn-back-to-login" type="button"
+                        style="background: none; border: none; color: var(--primary-color); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; margin-bottom: 15px; padding: 0;">←
+                        Retour à la connexion</button>
                     <h2>Inscription Utilisateur</h2>
                     <p class="subtitle">Créez votre compte pour suivre vos ristournes et paiements cash.</p>
                     <form id="register-form">
@@ -93,7 +95,9 @@
                         <button type="submit" class="btn-primary" style="background: var(--success);">S'inscrire <span
                                 class="arrow">→</span></button>
                         <div style="text-align: center; margin-top: 15px;">
-                            <button id="link-back-to-login" type="button" style="background: none; border: none; color: var(--primary-color); font-weight: 600; cursor: pointer; font-size: 0.88rem; text-decoration: underline;">← Déjà inscrit ? Se connecter</button>
+                            <button id="link-back-to-login" type="button"
+                                style="background: none; border: none; color: var(--primary-color); font-weight: 600; cursor: pointer; font-size: 0.88rem; text-decoration: underline;">←
+                                Déjà inscrit ? Se connecter</button>
                         </div>
                         <p class="text-muted text-center mt-10" style="font-size: 0.8rem; line-height: 1.4;">💡 Après
                             l'inscription, l'administrateur validera le nombre de vos parts pour activer votre compte.
@@ -170,7 +174,9 @@
                 </div>
             </nav>
             <div class="sidebar-footer">
-                <button id="logout-btn" class="btn-logout" style="display: flex; align-items: center; justify-content: center; gap: 6px;">🚪 Se déconnecter</button>
+                <button id="logout-btn" class="btn-logout"
+                    style="display: flex; align-items: center; justify-content: center; gap: 6px;">🚪 Se
+                    déconnecter</button>
             </div>
         </aside>
 
@@ -217,7 +223,8 @@
                             <div class="stat-icon">💎</div>
                             <div class="stat-info">
                                 <h3>Total Parts</h3>
-                                <p class="stat-value" style="color: #805ad5;"><span id="accueil-total-parts">0</span></p>
+                                <p class="stat-value" style="color: #805ad5;"><span id="accueil-total-parts">0</span>
+                                </p>
                             </div>
                         </div>
                         <div class="stat-card glass-inner">
@@ -246,30 +253,45 @@
                     </div>
 
                     <!-- Panel Cycle 63 Jours (9 Semaines) -->
-                    <div class="panel glass-panel mb-20" style="background: linear-gradient(135deg, #ffffff 0%, #f7fafc 100%); border-left: 4px solid var(--primary-color);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-                            <h3 style="margin: 0; color: var(--primary-color); font-size: 1.1rem;">📅 Suivi du Cycle de Ristourne (63 Jours / 9 Semaines)</h3>
-                            <span class="badge" style="background: var(--primary-color); color: white; padding: 4px 10px; font-size: 0.8rem; border-radius: 12px;">Cycle Actif</span>
+                    <div class="panel glass-panel mb-20"
+                        style="background: linear-gradient(135deg, #ffffff 0%, #f7fafc 100%); border-left: 4px solid var(--primary-color);">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="margin: 0; color: var(--primary-color); font-size: 1.1rem;">📅 Suivi du Cycle de
+                                Ristourne (63 Jours / 9 Semaines)</h3>
+                            <span class="badge"
+                                style="background: var(--primary-color); color: white; padding: 4px 10px; font-size: 0.8rem; border-radius: 12px;">Cycle
+                                Actif</span>
                         </div>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 15px;">
-                            <div style="background: #fffaf0; border: 1px solid #feebc8; padding: 12px; border-radius: 8px;">
+                        <div
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 15px;">
+                            <div
+                                style="background: #fffaf0; border: 1px solid #feebc8; padding: 12px; border-radius: 8px;">
                                 <small style="color: #c05621; font-weight: 600;">1er Jour (Administrateur)</small>
-                                <div style="font-size: 1.1rem; font-weight: 700; color: #dd6b20; margin-top: 4px;"><span id="user-cycle-day1-val">0</span> Fc</div>
+                                <div style="font-size: 1.1rem; font-weight: 700; color: #dd6b20; margin-top: 4px;"><span
+                                        id="user-cycle-day1-val">0</span> Fc</div>
                                 <small style="font-size: 0.75rem; color: #718096;">(Nombre de parts × 1 000 Fc)</small>
                             </div>
-                            <div style="background: #f0fff4; border: 1px solid #c6f6d5; padding: 12px; border-radius: 8px;">
+                            <div
+                                style="background: #f0fff4; border: 1px solid #c6f6d5; padding: 12px; border-radius: 8px;">
                                 <small style="color: #276749; font-weight: 600;">62 Jours Restants (Client)</small>
-                                <div style="font-size: 1.1rem; font-weight: 700; color: #38a169; margin-top: 4px;"><span id="user-cycle-62days-val">0</span> Fc</div>
+                                <div style="font-size: 1.1rem; font-weight: 700; color: #38a169; margin-top: 4px;"><span
+                                        id="user-cycle-62days-val">0</span> Fc</div>
                                 <small style="font-size: 0.75rem; color: #718096;">(Nombre de parts × 62 000 Fc)</small>
                             </div>
-                            <div style="background: #ebf8ff; border: 1px solid #bee3f8; padding: 12px; border-radius: 8px;">
+                            <div
+                                style="background: #ebf8ff; border: 1px solid #bee3f8; padding: 12px; border-radius: 8px;">
                                 <small style="color: #2c5282; font-weight: 600;">Progression du Cycle</small>
-                                <div style="font-size: 1.1rem; font-weight: 700; color: #3182ce; margin-top: 4px;"><span id="user-cycle-days-count">0</span> / 62 Jours</div>
+                                <div style="font-size: 1.1rem; font-weight: 700; color: #3182ce; margin-top: 4px;"><span
+                                        id="user-cycle-days-count">0</span> / 62 Jours</div>
                                 <small style="font-size: 0.75rem; color: #718096;">Jours d'épargne effectifs</small>
                             </div>
                         </div>
-                        <div style="background: #e2e8f0; height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 8px;">
-                            <div id="user-cycle-progress-bar" style="background: linear-gradient(90deg, #3182ce, #38a169); width: 0%; height: 100%; transition: width 0.3s ease;"></div>
+                        <div
+                            style="background: #e2e8f0; height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 8px;">
+                            <div id="user-cycle-progress-bar"
+                                style="background: linear-gradient(90deg, #3182ce, #38a169); width: 0%; height: 100%; transition: width 0.3s ease;">
+                            </div>
                         </div>
                         <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #718096;">
                             <span>1er Jour (Frais Admin)</span>
@@ -360,22 +382,34 @@
                 <!-- Tab Messagerie Membre -->
                 <div id="tab-messagerie-user" class="tab-pane fade-in">
                     <div class="panel glass-panel">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
                             <div>
                                 <h3 style="margin: 0; color: var(--primary-color);">💬 Support & Messagerie Directe</h3>
-                                <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">Discutez directement avec l'administration de ZUBIKS SERVICE en cas de problème ou de question.</p>
+                                <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">Discutez
+                                    directement avec l'administration de ZUBIKS SERVICE en cas de problème ou de
+                                    question.</p>
                             </div>
-                            <span class="badge" style="background: var(--success); color: white; padding: 4px 10px; font-size: 0.8rem; border-radius: 12px;">Support En Ligne</span>
+                            <span class="badge"
+                                style="background: var(--success); color: white; padding: 4px 10px; font-size: 0.8rem; border-radius: 12px;">Support
+                                En Ligne</span>
                         </div>
-                        <div id="user-chat-messages" style="min-height: 350px; max-height: 450px; overflow-y: auto; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                        <div id="user-chat-messages"
+                            style="min-height: 350px; max-height: 450px; overflow-y: auto; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
                             <!-- User messages injected here -->
                         </div>
                         <form id="user-chat-form" class="chat-input-bar">
                             <div class="chat-input-wrapper">
-                                <textarea id="user-chat-input" class="chat-input-field" rows="1" placeholder="Écrivez votre message à l'administrateur..." required autocomplete="off"></textarea>
+                                <textarea id="user-chat-input" class="chat-input-field" rows="1"
+                                    placeholder="Écrivez votre message à l'administrateur..." required
+                                    autocomplete="off"></textarea>
                                 <button type="submit" class="chat-send-btn">
                                     <span>Envoyer</span>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                    </svg>
                                 </button>
                             </div>
                         </form>
@@ -577,33 +611,53 @@
                     <div class="panel glass-panel" style="padding: 0; overflow: hidden;">
                         <div class="admin-chat-grid">
                             <!-- Conversations List Sidebar -->
-                            <div class="chat-threads-panel" style="border-right: 1px solid #e2e8f0; background: #f8fafc; padding: 15px; display: flex; flex-direction: column;">
-                                <h4 style="margin-bottom: 12px; color: var(--primary-color);">💬 Conversations Client</h4>
-                                <input type="text" id="search-chat-member" placeholder="Rechercher un membre..." style="padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; margin-bottom: 12px;">
-                                <div id="admin-chat-threads" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+                            <div class="chat-threads-panel"
+                                style="border-right: 1px solid #e2e8f0; background: #f8fafc; padding: 15px; display: flex; flex-direction: column;">
+                                <h4 style="margin-bottom: 12px; color: var(--primary-color);">💬 Conversations Client
+                                </h4>
+                                <input type="text" id="search-chat-member" placeholder="Rechercher un membre..."
+                                    style="padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; margin-bottom: 12px;">
+                                <div id="admin-chat-threads"
+                                    style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
                                     <!-- Injected threads -->
                                 </div>
                             </div>
                             <!-- Active Chat Box -->
-                            <div class="chat-active-panel" style="display: flex; flex-direction: column; background: white;">
-                                <div style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; background: #f7fafc; display: flex; align-items: center; justify-content: space-between;">
+                            <div class="chat-active-panel"
+                                style="display: flex; flex-direction: column; background: white;">
+                                <div
+                                    style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; background: #f7fafc; display: flex; align-items: center; justify-content: space-between;">
                                     <div style="display: flex; align-items: center; gap: 10px;">
-                                        <button id="admin-chat-mobile-back" type="button" class="btn-chat-back" style="display: none; background: #edf2f7; border: 1px solid #cbd5e0; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">← Liste</button>
+                                        <button id="admin-chat-mobile-back" type="button" class="btn-chat-back"
+                                            style="display: none; background: #edf2f7; border: 1px solid #cbd5e0; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">←
+                                            Liste</button>
                                         <div>
-                                            <h4 id="admin-chat-header-name" style="margin: 0; color: #2d3748;">Sélectionnez un membre</h4>
-                                            <small id="admin-chat-header-info" class="text-muted" style="font-size: 0.8rem;">Cliquez sur un membre pour lire et répondre.</small>
+                                            <h4 id="admin-chat-header-name" style="margin: 0; color: #2d3748;">
+                                                Sélectionnez un membre</h4>
+                                            <small id="admin-chat-header-info" class="text-muted"
+                                                style="font-size: 0.8rem;">Cliquez sur un membre pour lire et
+                                                répondre.</small>
                                         </div>
                                     </div>
                                 </div>
-                                <div id="admin-chat-messages" style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #f8fafc; max-height: 380px;">
-                                    <div class="text-center text-muted" style="margin-top: 60px;">👈 Sélectionnez une conversation dans la liste de gauche pour afficher les messages.</div>
+                                <div id="admin-chat-messages"
+                                    style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #f8fafc; max-height: 380px;">
+                                    <div class="text-center text-muted" style="margin-top: 60px;">👈 Sélectionnez une
+                                        conversation dans la liste de gauche pour afficher les messages.</div>
                                 </div>
                                 <form id="admin-chat-form" class="chat-input-bar">
                                     <div class="chat-input-wrapper">
-                                        <textarea id="admin-chat-input" class="chat-input-field" rows="1" placeholder="Écrivez votre réponse..." disabled autocomplete="off"></textarea>
+                                        <textarea id="admin-chat-input" class="chat-input-field" rows="1"
+                                            placeholder="Écrivez votre réponse..." disabled
+                                            autocomplete="off"></textarea>
                                         <button type="submit" id="admin-chat-send-btn" class="chat-send-btn" disabled>
                                             <span>Répondre</span>
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                stroke-linejoin="round">
+                                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                            </svg>
                                         </button>
                                     </div>
                                 </form>

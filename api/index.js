@@ -197,7 +197,7 @@ app.post('/api/auth/login', (req, res) => {
     }
   }
 
-  return res.status(401).json({ error: "Email ou mot de passe incorrect." });
+  return res.status(401).json({ error: "Email ou mot de passe incorrect. Si un nouveau cycle a démarré, veuillez créer à nouveau votre compte." });
 });
 
 // API: Auth Register

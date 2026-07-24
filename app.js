@@ -145,13 +145,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error("HTTP error " + response.status);
             const parsed = await response.json();
             
-            let serverHasData = (parsed.members && parsed.members.length > 0) || (parsed.transactions && parsed.transactions.length > 0);
+            let serverIsVirgin = (!parsed.archives || parsed.archives.length === 0) &&
+                                 (!parsed.members || parsed.members.length === 0) &&
+                                 (!parsed.transactions || parsed.transactions.length === 0) &&
+                                 (!parsed.reglements || parsed.reglements.trim() === "");
             
-            if (!serverHasData) {
-                // Serveur retourné vierge : vérifier si localStorage contient des données à restaurer/synchroniser
+            if (serverIsVirgin) {
+                // Serveur retourné complètement vierge : vérifier si localStorage contient des données à restaurer/synchroniser
                 const savedState = localStorage.getItem('zubiksStateV2') || localStorage.getItem('zubixStateV2');
                 if (savedState) {
-                    console.log("Base de données serveur vide, restauration des données du stockage local.");
+                    console.log("Base de données serveur vierge, restauration des données du stockage local.");
                     loadFromLocal();
                     saveState(); // Synchroniser les données locales vers le serveur
                     renderAll();
@@ -1672,28 +1675,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 cycleDepots: state.cycleDepots || 0,
                 cycleRetraits: state.cycleRetraits || 0,
                 solde: cycleSolde,
-                membersSnapshot: JSON.parse(JSON.stringify(state.members)) // save snapshot of members state
+                membersSnapshot: JSON.parse(JSON.stringify(state.members || [])),
+                transactionsSnapshot: JSON.parse(JSON.stringify(state.transactions || []))
             };
             
             if (!state.archives) state.archives = [];
             state.archives.push(newArchive);
 
-            // Reset totals
+            // Réinitialisation complète pour le nouveau cycle (0 membre)
             state.dailyDepots = 0;
             state.cycleDepots = 0;
             state.dailyRetraits = 0;
             state.cycleRetraits = 0;
-            state.transactions = []; // On reset aussi les transactions pour le nouveau cycle
-
-            // Reset members operations
-            state.members.forEach(m => {
-                m.totalDepot = 0;
-                m.totalRetrait = 0;
-            });
+            state.argentDebut = 0;
+            state.transactions = [];
+            state.dailyArchives = [];
+            state.deletedMembers = [];
+            state.members = []; // 0 membre pour le nouveau cycle
+            state.messages = [];
 
             saveState();
             renderAll();
-            showToast('Cycle sauvegardé avec succès. Nouveau cycle démarré.', 'success');
+            showToast('Nouveau cycle démarré avec 0 membre. Les utilisateurs peuvent à présent créer de nouveau leur compte.', 'success');
         });
     }
 
