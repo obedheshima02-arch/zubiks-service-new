@@ -1294,3 +1294,75 @@ button {
         white-space: nowrap;
     }
 }
+
+/* --- Responsive Messaging System Styles --- */
+.admin-chat-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 520px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.chat-thread-item {
+    transition: background-color 0.2s ease;
+}
+
+.chat-thread-item:hover {
+    background-color: #edf2f7 !important;
+}
+
+@media (max-width: 768px) {
+    .admin-chat-grid {
+        grid-template-columns: 1fr !important;
+        min-height: 450px !important;
+    }
+
+    /* On mobile screens, toggle view between conversation list and active chat box */
+    .admin-chat-grid.mobile-chat-open .chat-threads-panel {
+        display: none !important;
+    }
+
+    .admin-chat-grid.mobile-chat-open .chat-active-panel {
+        display: flex !important;
+    }
+
+    .admin-chat-grid:not(.mobile-chat-open) .chat-threads-panel {
+        display: flex !important;
+    }
+
+    .admin-chat-grid:not(.mobile-chat-open) .chat-active-panel {
+        display: none !important;
+    }
+
+    .btn-chat-back {
+        display: inline-flex !important;
+    }
+
+    #user-chat-messages,
+    #admin-chat-messages {
+        max-height: 340px !important;
+        min-height: 240px !important;
+        padding: 10px !important;
+    }
+
+    #user-chat-form,
+    #admin-chat-form {
+        flex-direction: row;
+        gap: 6px !important;
+        padding: 8px !important;
+    }
+
+    #user-chat-input,
+    #admin-chat-input {
+        font-size: 0.9rem !important;
+        padding: 8px 10px !important;
+    }
+
+    #user-chat-form button,
+    #admin-chat-form button {
+        padding: 8px 12px !important;
+        font-size: 0.85rem !important;
+        white-space: nowrap;
+    }
+}

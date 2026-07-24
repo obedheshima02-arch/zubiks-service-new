@@ -1115,6 +1115,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 searchChatInput.addEventListener('input', () => renderMessaging());
             }
 
+            const mobileBackBtn = document.getElementById('admin-chat-mobile-back');
+            if (mobileBackBtn && !mobileBackBtn.hasAttribute('data-bound')) {
+                mobileBackBtn.setAttribute('data-bound', 'true');
+                mobileBackBtn.addEventListener('click', () => {
+                    selectedAdminChatMemberId = null;
+                    const chatGrid = document.querySelector('.admin-chat-grid');
+                    if (chatGrid) chatGrid.classList.remove('mobile-chat-open');
+                    renderAll();
+                });
+            }
+
+            const chatGrid = document.querySelector('.admin-chat-grid');
+            if (chatGrid) {
+                if (selectedAdminChatMemberId) {
+                    chatGrid.classList.add('mobile-chat-open');
+                } else {
+                    chatGrid.classList.remove('mobile-chat-open');
+                }
+            }
+
             if (adminThreadsContainer) {
                 adminThreadsContainer.innerHTML = '';
                 const filteredMembers = activeMembers.filter(m => (m.nom || '').toLowerCase().includes(searchTerm));
@@ -1146,6 +1166,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                     markUpdated = true;
                                 }
                             });
+                            const chatGrid = document.querySelector('.admin-chat-grid');
+                            if (chatGrid) chatGrid.classList.add('mobile-chat-open');
+
                             if (markUpdated) saveState();
                             renderAll();
                         };

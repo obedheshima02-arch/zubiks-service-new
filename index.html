@@ -188,7 +188,7 @@
                         style="background: var(--primary-light); color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">Admin</span>
                     <span class="user-name" id="logged-user-name">Admin ZUBIKS</span>
                     <div class="avatar" id="logged-user-avatar">AZ</div>
-                    <button id="header-logout-btn" class="btn-logout-header" style="background: #fff5f5; color: var(--danger); border: 1px solid #fed7d7; padding: 6px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; transition: all 0.2s;" title="Se déconnecter de votre compte">🚪 Déconnexion</button>
+                    <button id="header-logout-btn" style="display: none;"></button>
                     <span id="payment-date-display" style="display: none;"></span>
                     <span id="daily-start" style="display: none;"></span>
                     <span id="cycle-start" style="display: none;"></span>
@@ -570,9 +570,9 @@
                 <!-- Tab Messagerie Admin -->
                 <div id="tab-messagerie-admin" class="tab-pane fade-in">
                     <div class="panel glass-panel" style="padding: 0; overflow: hidden;">
-                        <div style="display: grid; grid-template-columns: 280px 1fr; min-height: 520px;">
+                        <div class="admin-chat-grid">
                             <!-- Conversations List Sidebar -->
-                            <div style="border-right: 1px solid #e2e8f0; background: #f8fafc; padding: 15px; display: flex; flex-direction: column;">
+                            <div class="chat-threads-panel" style="border-right: 1px solid #e2e8f0; background: #f8fafc; padding: 15px; display: flex; flex-direction: column;">
                                 <h4 style="margin-bottom: 12px; color: var(--primary-color);">💬 Conversations Client</h4>
                                 <input type="text" id="search-chat-member" placeholder="Rechercher un membre..." style="padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; margin-bottom: 12px;">
                                 <div id="admin-chat-threads" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
@@ -580,19 +580,22 @@
                                 </div>
                             </div>
                             <!-- Active Chat Box -->
-                            <div style="display: flex; flex-direction: column; background: white;">
-                                <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; background: #f7fafc; display: flex; align-items: center; justify-content: space-between;">
-                                    <div>
-                                        <h4 id="admin-chat-header-name" style="margin: 0; color: #2d3748;">Sélectionnez un membre</h4>
-                                        <small id="admin-chat-header-info" class="text-muted" style="font-size: 0.8rem;">Cliquez sur un membre à gauche pour lire et répondre.</small>
+                            <div class="chat-active-panel" style="display: flex; flex-direction: column; background: white;">
+                                <div style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; background: #f7fafc; display: flex; align-items: center; justify-content: space-between;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <button id="admin-chat-mobile-back" type="button" class="btn-chat-back" style="display: none; background: #edf2f7; border: 1px solid #cbd5e0; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">← Liste</button>
+                                        <div>
+                                            <h4 id="admin-chat-header-name" style="margin: 0; color: #2d3748;">Sélectionnez un membre</h4>
+                                            <small id="admin-chat-header-info" class="text-muted" style="font-size: 0.8rem;">Cliquez sur un membre pour lire et répondre.</small>
+                                        </div>
                                     </div>
                                 </div>
-                                <div id="admin-chat-messages" style="flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #f8fafc; max-height: 380px;">
+                                <div id="admin-chat-messages" style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #f8fafc; max-height: 380px;">
                                     <div class="text-center text-muted" style="margin-top: 60px;">👈 Sélectionnez une conversation dans la liste de gauche pour afficher les messages.</div>
                                 </div>
-                                <form id="admin-chat-form" style="padding: 12px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px; background: white;">
-                                    <input type="text" id="admin-chat-input" placeholder="Écrivez votre réponse à l'utilisateur..." style="flex: 1; padding: 10px 14px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 0.95rem;" disabled>
-                                    <button type="submit" id="admin-chat-send-btn" class="btn-primary" style="padding: 10px 20px;" disabled>Répondre 📤</button>
+                                <form id="admin-chat-form" style="padding: 10px 12px; border-top: 1px solid #e2e8f0; display: flex; gap: 8px; background: white;">
+                                    <input type="text" id="admin-chat-input" placeholder="Écrivez votre réponse..." style="flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 0.9rem;" disabled>
+                                    <button type="submit" id="admin-chat-send-btn" class="btn-primary" style="padding: 10px 16px; font-size: 0.88rem; white-space: nowrap;" disabled>Répondre 📤</button>
                                 </form>
                             </div>
                         </div>
