@@ -243,6 +243,11 @@ app.post('/api/auth/register', (req, res) => {
     ]
   };
 
+  // Effacer l'email de deletedMembers s'il y figure afin d'autoriser la réinscription
+  if (state.deletedMembers) {
+    state.deletedMembers = state.deletedMembers.filter(d => (d.email || '').toLowerCase() !== lowerEmail);
+  }
+
   state.members.push(newUser);
   saveStateToDisk(state);
 

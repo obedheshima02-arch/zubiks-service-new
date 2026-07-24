@@ -356,6 +356,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     dateAjout: new Date().toISOString(),
                     notifications: [{ id: Date.now().toString(), message: "Bienvenue sur ZUBIX SERVICE !", date: new Date().toISOString(), read: false }]
                 };
+                if (state.deletedMembers) {
+                    state.deletedMembers = state.deletedMembers.filter(d => (d.email || '').toLowerCase() !== lowerEmail);
+                }
                 state.members.push(newUser);
                 saveState();
                 renderAll();
