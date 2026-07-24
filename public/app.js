@@ -1077,7 +1077,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const timeStr = new Date(m.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
                         bubble.innerHTML = `
                             <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">${isMe ? 'Vous' : 'Admin ZUBIKS'} • ${timeStr}</div>
-                            <div style="font-size: 0.95rem; line-height: 1.4; word-break: break-word;">${m.text}</div>
+                            <div style="font-size: 0.95rem; line-height: 1.45; word-break: break-word; white-space: pre-wrap;">${m.text}</div>
                         `;
                         userChatMessages.appendChild(bubble);
                     });
@@ -1220,7 +1220,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const timeStr = new Date(m.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
                             bubble.innerHTML = `
                                 <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">${isAdminMsg ? 'Vous (Admin)' : selectedMember.nom} • ${timeStr}</div>
-                                <div style="font-size: 0.95rem; line-height: 1.4; word-break: break-word;">${m.text}</div>
+                                <div style="font-size: 0.95rem; line-height: 1.45; word-break: break-word; white-space: pre-wrap;">${m.text}</div>
                             `;
                             adminChatMessages.appendChild(bubble);
                         });
@@ -1302,10 +1302,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 saveState();
                 renderAll();
-                if (input) input.value = '';
+                if (input) { input.value = ''; input.style.height = 'auto'; }
             }
         });
     }
+
+    // Auto-expand & Enter to send key handlers for chat textareas
+    const setupTextareaAutoExpand = () => {
+        const userChatInput = document.getElementById('user-chat-input');
+        const adminChatInput = document.getElementById('admin-chat-input');
+
+        [userChatInput, adminChatInput].forEach(textarea => {
+            if (textarea && !textarea.hasAttribute('data-autoexpand-bound')) {
+                textarea.setAttribute('data-autoexpand-bound', 'true');
+
+                textarea.addEventListener('input', () => {
+                    textarea.style.height = 'auto';
+                    textarea.style.height = Math.min(textarea.scrollHeight, 140) + 'px';
+                });
+
+                textarea.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        textarea.form?.requestSubmit();
+                    }
+                });
+            }
+        });
+    };
+    setupTextareaAutoExpand();
 
     let currentOperationMemberId = null;
     let currentOperationType = null;
