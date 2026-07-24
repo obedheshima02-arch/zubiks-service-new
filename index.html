@@ -61,6 +61,7 @@
 
                 <!-- Formulaire d'Inscription -->
                 <div id="register-form-wrapper" style="display: none;">
+                    <button id="btn-back-to-login" type="button" style="background: none; border: none; color: var(--primary-color); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; margin-bottom: 15px; padding: 0;">← Retour à la connexion</button>
                     <h2>Inscription Utilisateur</h2>
                     <p class="subtitle">Créez votre compte pour suivre vos ristournes et paiements cash.</p>
                     <form id="register-form">
@@ -91,6 +92,9 @@
                         </div>
                         <button type="submit" class="btn-primary" style="background: var(--success);">S'inscrire <span
                                 class="arrow">→</span></button>
+                        <div style="text-align: center; margin-top: 15px;">
+                            <button id="link-back-to-login" type="button" style="background: none; border: none; color: var(--primary-color); font-weight: 600; cursor: pointer; font-size: 0.88rem; text-decoration: underline;">← Déjà inscrit ? Se connecter</button>
+                        </div>
                         <p class="text-muted text-center mt-10" style="font-size: 0.8rem; line-height: 1.4;">💡 Après
                             l'inscription, l'administrateur validera le nombre de vos parts pour activer votre compte.
                         </p>
@@ -166,7 +170,7 @@
                 </div>
             </nav>
             <div class="sidebar-footer">
-                <button id="logout-btn" class="btn-logout">Déconnexion</button>
+                <button id="logout-btn" class="btn-logout" style="display: flex; align-items: center; justify-content: center; gap: 6px;">🚪 Se déconnecter</button>
             </div>
         </aside>
 
@@ -184,7 +188,7 @@
                         style="background: var(--primary-light); color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">Admin</span>
                     <span class="user-name" id="logged-user-name">Admin ZUBIKS</span>
                     <div class="avatar" id="logged-user-avatar">AZ</div>
-                    <button id="header-logout-btn" style="display: none;"></button>
+                    <button id="header-logout-btn" class="btn-logout-header" style="background: #fff5f5; color: var(--danger); border: 1px solid #fed7d7; padding: 6px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; transition: all 0.2s;" title="Se déconnecter de votre compte">🚪 Déconnexion</button>
                     <span id="payment-date-display" style="display: none;"></span>
                     <span id="daily-start" style="display: none;"></span>
                     <span id="cycle-start" style="display: none;"></span>

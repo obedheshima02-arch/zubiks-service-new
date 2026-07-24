@@ -277,6 +277,16 @@ document.addEventListener('DOMContentLoaded', () => {
             registerFormWrapper.style.display = 'block';
             loginFormWrapper.style.display = 'none';
         });
+
+        const btnBackToLogin = document.getElementById('btn-back-to-login');
+        const linkBackToLogin = document.getElementById('link-back-to-login');
+
+        if (btnBackToLogin) {
+            btnBackToLogin.addEventListener('click', () => btnShowLogin.click());
+        }
+        if (linkBackToLogin) {
+            linkBackToLogin.addEventListener('click', () => btnShowLogin.click());
+        }
     }
 
     // Formulaire d'inscription Utilisateur
