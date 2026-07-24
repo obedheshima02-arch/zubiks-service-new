@@ -30,8 +30,10 @@ const DEFAULT_STATE = {
   archives: [],
   dailyArchives: [],
   transactions: [],
+  deletedMembers: [],
+  messages: [],
   credentials: {
-    email: "Obedtechn02@gmail.com",
+    email: "zubiksservice@gmail.com",
     passwordHash: bcrypt.hashSync("Zubiks@2000", 10)
   }
 };
@@ -50,6 +52,16 @@ function loadStateFromDisk() {
       if (parsed.credentials && !parsed.credentials.passwordHash && parsed.credentials.password) {
         parsed.credentials.passwordHash = bcrypt.hashSync(parsed.credentials.password, 10);
         delete parsed.credentials.password;
+      }
+      
+      // Auto-migrate stale admin email on server database load
+      if (parsed.credentials && parsed.credentials.email && parsed.credentials.email.toLowerCase() === 'obedtechn02@gmail.com') {
+        parsed.credentials.email = 'zubiksservice@gmail.com';
+        try {
+          fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+        } catch (writeErr) {
+          console.error("Erreur d'écriture lors de la migration de l'email admin :", writeErr);
+        }
       }
       
       memoryState = parsed;
@@ -120,7 +132,7 @@ app.post('/api/auth/login', (req, res) => {
   const lowerEmail = email.trim().toLowerCase();
 
   // Check Admin credentials
-  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : "Obedtechn02@gmail.com";
+  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : "zubiksservice@gmail.com";
   let isAdminMatch = false;
 
   if (lowerEmail === adminEmail) {
@@ -144,7 +156,15 @@ app.post('/api/auth/login', (req, res) => {
       };
       const token = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '7d' });
       return res.json({ success: true, token, user: userPayload });
+    } else {
+      return res.status(401).json({ error: "Email ou mot de passe incorrect." });
     }
+  }
+
+  // Check if account was deleted
+  const isDeleted = (state.deletedMembers || []).some(d => (d.email || '').toLowerCase() === lowerEmail);
+  if (isDeleted) {
+    return res.status(403).json({ error: "Votre compte a été supprimé." });
   }
 
   // Check Member User credentials
@@ -191,7 +211,7 @@ app.post('/api/auth/register', (req, res) => {
   const lowerEmail = email.trim().toLowerCase();
 
   const existing = state.members.find(m => (m.email || '').toLowerCase() === lowerEmail);
-  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : "Obedtechn02@gmail.com";
+  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : "zubiksservice@gmail.com";
 
   if (existing || lowerEmail === adminEmail) {
     return res.status(400).json({ error: "Cette adresse email est déjà enregistrée." });
@@ -237,6 +257,14 @@ app.post('/api/auth/credentials', authenticateToken, requireAdmin, (req, res) =>
   }
 
   const state = loadStateFromDisk();
+  const lowerNewEmail = newEmail.trim().toLowerCase();
+
+  // Check if new email is already used by a member
+  const existingMember = state.members.find(m => (m.email || '').toLowerCase() === lowerNewEmail);
+  if (existingMember) {
+    return res.status(400).json({ error: "Cette adresse email est déjà utilisée par un membre." });
+  }
+
   if (!state.credentials) state.credentials = {};
 
   state.credentials.email = newEmail.trim();
@@ -266,10 +294,9 @@ app.post('/api/state', (req, res) => {
 
   const existingState = loadStateFromDisk();
   
-  // Preserve sensitive password hashes if stripped by client
-  if (existingState.credentials && existingState.credentials.passwordHash) {
-    if (!newState.credentials) newState.credentials = {};
-    newState.credentials.passwordHash = existingState.credentials.passwordHash;
+  // Preserve sensitive admin credentials entirely from existing state
+  if (existingState.credentials) {
+    newState.credentials = existingState.credentials;
   }
 
   if (Array.isArray(newState.members)) {

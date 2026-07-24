@@ -82,8 +82,10 @@ document.addEventListener('DOMContentLoaded', () => {
         archives: [], // Sauvegarde des cycles passés
         dailyArchives: [], // Historique des journées
         transactions: [], // Historique des transactions
+        deletedMembers: [], // [{ id, email, nom, deletedAt }]
+        messages: [], // [{ id, memberId, sender, senderName, text, timestamp, readByAdmin, readByUser }]
         credentials: {
-            email: 'Obedtechn02@gmail.com',
+            email: 'zubiksservice@gmail.com',
             password: 'Zubiks@2000'
         }
     };
@@ -113,11 +115,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     state.archives = parsed.archives || [];
                     state.dailyArchives = parsed.dailyArchives || [];
                     state.transactions = parsed.transactions || [];
+                    state.deletedMembers = parsed.deletedMembers || [];
+                    state.messages = parsed.messages || [];
                     state.argentDebut = parsed.argentDebut !== undefined ? parsed.argentDebut : 0;
                     state.credentials = parsed.credentials || {
-                        email: 'Obedtechn02@gmail.com',
+                        email: 'zubiksservice@gmail.com',
                         password: 'Zubiks@2000'
                     };
+
+                    // Auto-migrate stale admin email
+                    if (state.credentials && state.credentials.email && state.credentials.email.toLowerCase() === 'obedtechn02@gmail.com') {
+                        state.credentials.email = 'zubiksservice@gmail.com';
+                    }
 
                     // Populate change credentials email
                     const changeEmailInput = document.getElementById('change-email');
@@ -162,11 +171,18 @@ document.addEventListener('DOMContentLoaded', () => {
             state.archives = parsed.archives || [];
             state.dailyArchives = parsed.dailyArchives || [];
             state.transactions = parsed.transactions || [];
+            state.deletedMembers = parsed.deletedMembers || [];
+            state.messages = parsed.messages || [];
             state.argentDebut = parsed.argentDebut !== undefined ? parsed.argentDebut : 0;
             state.credentials = parsed.credentials || {
-                email: 'Obedtechn02@gmail.com',
+                email: 'zubiksservice@gmail.com',
                 password: 'Zubiks@2000'
             };
+
+            // Auto-migrate stale admin email
+            if (state.credentials && state.credentials.email && state.credentials.email.toLowerCase() === 'obedtechn02@gmail.com') {
+                state.credentials.email = 'zubiksservice@gmail.com';
+            }
 
             console.log("Données chargées depuis le serveur dynamique.");
             // Render rules in rules textarea if present
@@ -302,13 +318,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (loginPasswordInput) setTimeout(() => loginPasswordInput.focus(), 150);
             } catch (err) {
                 console.error("Erreur inscription API, fallback local :", err);
+                const lowerEmail = email.toLowerCase();
+                const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : 'zubiksservice@gmail.com';
+                const existing = state.members.find(m => (m.email || '').toLowerCase() === lowerEmail);
+
+                if (existing || lowerEmail === targetAdminEmail) {
+                    showToast("Cette adresse email est déjà enregistrée.", "error");
+                    return;
+                }
+
                 const fullName = `${nom} ${postnom}`.trim();
                 const newUser = {
                     id: Date.now().toString(),
                     nom: fullName,
                     postnom: postnom,
                     sexe: sexe,
-                    email: email,
+                    email: lowerEmail,
+                    password: password,
                     role: 'user',
                     status: 'pending',
                     parts: 0,
@@ -367,22 +393,34 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast(`Connexion réussie (${currentUser.role === 'admin' ? 'Administrateur' : currentUser.nom})`, 'success');
         } catch (err) {
             console.error("Erreur de connexion serveur, fallback local :", err);
-            const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : 'Obedtechn02@gmail.com';
-            const targetAdminPassword = (state.credentials && state.credentials.password) ? state.credentials.password : 'Zubiks@2000';
 
-            if (email === targetAdminEmail && password === targetAdminPassword) {
-                currentUser = { role: 'admin', nom: 'Admin ZUBIKS', email: targetAdminEmail };
-                saveActiveSession(currentUser);
-                switchRoleView();
-                loginScreen.classList.remove('active');
-                dashboardScreen.classList.add('active');
-                updateDates();
-                renderAll();
-                showToast('Connexion Administrateur réussie', 'success');
+            // Check if email belongs to a deleted account
+            const isDeletedLocal = (state.deletedMembers || []).some(d => (d.email || '').toLowerCase() === email);
+            if (isDeletedLocal) {
+                showToast('Votre compte a été supprimé par l\'administrateur.', 'error');
                 return;
             }
 
-            const userMatch = state.members.find(m => (m.email || '').toLowerCase() === email && (m.password === password || m.passwordHash));
+            const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : 'zubiksservice@gmail.com';
+            const targetAdminPassword = (state.credentials && state.credentials.password) ? state.credentials.password : 'Zubiks@2000';
+
+            if (email === targetAdminEmail) {
+                if (password === targetAdminPassword) {
+                    currentUser = { role: 'admin', nom: 'Admin ZUBIKS', email: targetAdminEmail };
+                    saveActiveSession(currentUser);
+                    switchRoleView();
+                    loginScreen.classList.remove('active');
+                    dashboardScreen.classList.add('active');
+                    updateDates();
+                    renderAll();
+                    showToast('Connexion Administrateur réussie', 'success');
+                } else {
+                    showToast('Email ou mot de passe incorrect.', 'error');
+                }
+                return;
+            }
+
+            const userMatch = state.members.find(m => (m.email || '').toLowerCase() === email && m.password === password);
             if (userMatch) {
                 currentUser = userMatch;
                 saveActiveSession(currentUser);
@@ -495,10 +533,12 @@ document.addEventListener('DOMContentLoaded', () => {
         'tab-depots': 'Gestion des Dépôts Cash',
         'tab-retraits': 'Gestion des Retraits Cash',
         'tab-transactions': 'Historique Général des Transactions',
+        'tab-messagerie-admin': 'Messagerie Clients',
         'tab-rapport': 'Rapports Financiers',
         'tab-apropos': 'Règlements & Paramètres',
         'tab-user-space': 'Mon Espace Membre',
         'tab-user-transactions': 'Mes Transactions',
+        'tab-messagerie-user': 'Support & Messagerie Directe',
         'tab-user-notifications': 'Centre de Notifications'
     };
 
@@ -814,6 +854,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (userTotalDepotsVal) userTotalDepotsVal.textContent = (currentUser.totalDepot || 0).toLocaleString('fr-FR');
             if (userTotalRetraitsVal) userTotalRetraitsVal.textContent = (currentUser.totalRetrait || 0).toLocaleString('fr-FR');
 
+            // 63 Days Cycle Breakdown (Requirement 2)
+            const userParts = parseInt(currentUser.parts) || 0;
+            const day1AdminVal = userParts * 1000;
+            const days62ClientVal = userParts * 62000;
+
+            const userCycleDay1Val = document.getElementById('user-cycle-day1-val');
+            const userCycle62DaysVal = document.getElementById('user-cycle-62days-val');
+            const userCycleDaysCount = document.getElementById('user-cycle-days-count');
+            const userCycleProgressBar = document.getElementById('user-cycle-progress-bar');
+
+            if (userCycleDay1Val) userCycleDay1Val.textContent = day1AdminVal.toLocaleString('fr-FR');
+            if (userCycle62DaysVal) userCycle62DaysVal.textContent = days62ClientVal.toLocaleString('fr-FR');
+
+            const totalUserDepots = currentUser.totalDepot || 0;
+            const dailyPartCost = userParts * 1000;
+            const estimatedDays = dailyPartCost > 0 ? Math.min(62, Math.floor(totalUserDepots / dailyPartCost)) : 0;
+            const progressPercent = Math.min(100, Math.round((estimatedDays / 62) * 100));
+
+            if (userCycleDaysCount) userCycleDaysCount.textContent = estimatedDays;
+            if (userCycleProgressBar) userCycleProgressBar.style.width = `${progressPercent}%`;
+
             if (userStatusBanner) {
                 if (currentUser.status === 'pending') {
                     userStatusBanner.innerHTML = `<span style="color: #c05621; font-weight: 600;">⚠️ Votre compte est en attente de la validation du nombre de vos parts par l'administrateur.</span>`;
@@ -888,7 +949,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Update Dashboard Home Stats (Admin)
-        accueilTotalMembres.textContent = activeMembers.length;
+        if (accueilTotalMembres) accueilTotalMembres.textContent = activeMembers.length;
+        const accueilTotalParts = document.getElementById('accueil-total-parts');
+        const totalPartsSum = activeMembers.reduce((sum, m) => sum + (parseInt(m.parts) || 0), 0);
+        if (accueilTotalParts) accueilTotalParts.textContent = totalPartsSum.toLocaleString('fr-FR');
+
         if (accueilTotalDepots) accueilTotalDepots.textContent = (state.cycleDepots || 0).toLocaleString('fr-FR');
         if (accueilTotalRetraits) accueilTotalRetraits.textContent = (state.cycleRetraits || 0).toLocaleString('fr-FR');
 
@@ -947,7 +1012,267 @@ document.addEventListener('DOMContentLoaded', () => {
                 dailyArchivesTableBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted" style="padding: 10px;">Aucune journée archivée.</td></tr>';
             }
         }
+
+        // Render Messaging System
+        renderMessaging();
     };
+
+    // --- Messaging System Logic (Admin <-> Member) ---
+    let selectedAdminChatMemberId = null;
+
+    const renderMessaging = () => {
+        // 1. User Chat View (Membre)
+        if (currentUser && currentUser.role !== 'admin') {
+            const userChatMessages = document.getElementById('user-chat-messages');
+            const userUnreadBadge = document.getElementById('user-unread-msg-badge');
+            const userMsgs = (state.messages || []).filter(m => String(m.memberId) === String(currentUser.id));
+            
+            // Mark received admin messages as read when user views messaging tab
+            const activeTab = document.querySelector('.tab-pane.active');
+            if (activeTab && activeTab.id === 'tab-messagerie-user') {
+                let updated = false;
+                userMsgs.forEach(m => {
+                    if (m.sender === 'admin' && !m.readByUser) {
+                        m.readByUser = true;
+                        updated = true;
+                    }
+                });
+                if (updated) saveState();
+            }
+
+            const unreadUserCount = userMsgs.filter(m => m.sender === 'admin' && !m.readByUser).length;
+            if (userUnreadBadge) {
+                if (unreadUserCount > 0) {
+                    userUnreadBadge.textContent = unreadUserCount;
+                    userUnreadBadge.style.display = 'inline-block';
+                } else {
+                    userUnreadBadge.style.display = 'none';
+                }
+            }
+
+            if (userChatMessages) {
+                userChatMessages.innerHTML = '';
+                if (userMsgs.length > 0) {
+                    userMsgs.forEach(m => {
+                        const isMe = m.sender === 'user';
+                        const bubble = document.createElement('div');
+                        bubble.style.maxWidth = '75%';
+                        bubble.style.alignSelf = isMe ? 'flex-end' : 'flex-start';
+                        bubble.style.background = isMe ? 'var(--primary-color)' : '#edf2f7';
+                        bubble.style.color = isMe ? 'white' : '#2d3748';
+                        bubble.style.padding = '10px 14px';
+                        bubble.style.borderRadius = isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px';
+                        bubble.style.boxShadow = '0 1px 2px rgba(0,0,0,0.08)';
+
+                        const timeStr = new Date(m.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                        bubble.innerHTML = `
+                            <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">${isMe ? 'Vous' : 'Admin ZUBIKS'} • ${timeStr}</div>
+                            <div style="font-size: 0.95rem; line-height: 1.4; word-break: break-word;">${m.text}</div>
+                        `;
+                        userChatMessages.appendChild(bubble);
+                    });
+                    userChatMessages.scrollTop = userChatMessages.scrollHeight;
+                } else {
+                    userChatMessages.innerHTML = '<div class="text-center text-muted" style="margin-top: 50px;">👋 Aucun message. Écrivez ci-dessous pour discuter avec l\'administrateur.</div>';
+                }
+            }
+        }
+
+        // 2. Admin Chat View
+        if (currentUser && currentUser.role === 'admin') {
+            const adminThreadsContainer = document.getElementById('admin-chat-threads');
+            const adminChatMessages = document.getElementById('admin-chat-messages');
+            const adminUnreadBadge = document.getElementById('admin-unread-msg-badge');
+            const searchChatInput = document.getElementById('search-chat-member');
+            const searchTerm = searchChatInput ? searchChatInput.value.toLowerCase() : '';
+
+            const allMsgs = state.messages || [];
+            const activeMembers = state.members.filter(m => m.status !== 'pending');
+            
+            // Total unread messages for admin
+            const totalAdminUnread = allMsgs.filter(m => m.sender === 'user' && !m.readByAdmin).length;
+            if (adminUnreadBadge) {
+                if (totalAdminUnread > 0) {
+                    adminUnreadBadge.textContent = totalAdminUnread;
+                    adminUnreadBadge.style.display = 'inline-block';
+                } else {
+                    adminUnreadBadge.style.display = 'none';
+                }
+            }
+
+            if (searchChatInput && !searchChatInput.hasAttribute('data-bound')) {
+                searchChatInput.setAttribute('data-bound', 'true');
+                searchChatInput.addEventListener('input', () => renderMessaging());
+            }
+
+            if (adminThreadsContainer) {
+                adminThreadsContainer.innerHTML = '';
+                const filteredMembers = activeMembers.filter(m => (m.nom || '').toLowerCase().includes(searchTerm));
+
+                if (filteredMembers.length > 0) {
+                    filteredMembers.forEach(m => {
+                        const mMsgs = allMsgs.filter(msg => String(msg.memberId) === String(m.id));
+                        const lastMsg = mMsgs[mMsgs.length - 1];
+                        const unreadCount = mMsgs.filter(msg => msg.sender === 'user' && !msg.readByAdmin).length;
+
+                        const item = document.createElement('div');
+                        item.className = 'chat-thread-item';
+                        item.style.padding = '10px';
+                        item.style.borderRadius = '8px';
+                        item.style.cursor = 'pointer';
+                        item.style.background = String(m.id) === String(selectedAdminChatMemberId) ? '#e2e8f0' : 'white';
+                        item.style.border = '1px solid #edf2f7';
+                        item.style.display = 'flex';
+                        item.style.justifyContent = 'space-between';
+                        item.style.alignItems = 'center';
+
+                        item.onclick = () => {
+                            selectedAdminChatMemberId = m.id;
+                            // Mark user messages as read by admin for this member
+                            let markUpdated = false;
+                            mMsgs.forEach(msg => {
+                                if (msg.sender === 'user' && !msg.readByAdmin) {
+                                    msg.readByAdmin = true;
+                                    markUpdated = true;
+                                }
+                            });
+                            if (markUpdated) saveState();
+                            renderAll();
+                        };
+
+                        item.innerHTML = `
+                            <div>
+                                <strong style="font-size: 0.9rem; color: #2d3748;">${m.nom}</strong>
+                                <div style="font-size: 0.8rem; color: #718096; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">
+                                    ${lastMsg ? lastMsg.text : 'Aucun message'}
+                                </div>
+                            </div>
+                            ${unreadCount > 0 ? `<span class="badge" style="background: var(--danger); color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.75rem;">${unreadCount}</span>` : ''}
+                        `;
+                        adminThreadsContainer.appendChild(item);
+                    });
+                } else {
+                    adminThreadsContainer.innerHTML = '<div class="text-center text-muted" style="padding: 10px; font-size: 0.85rem;">Aucun membre trouvé.</div>';
+                }
+            }
+
+            // Render selected conversation in Admin Chat Window
+            const selectedMember = activeMembers.find(m => String(m.id) === String(selectedAdminChatMemberId));
+            const chatHeaderName = document.getElementById('admin-chat-header-name');
+            const chatHeaderInfo = document.getElementById('admin-chat-header-info');
+            const chatInput = document.getElementById('admin-chat-input');
+            const chatSendBtn = document.getElementById('admin-chat-send-btn');
+
+            if (selectedMember) {
+                if (chatHeaderName) chatHeaderName.textContent = selectedMember.nom;
+                if (chatHeaderInfo) chatHeaderInfo.textContent = `${selectedMember.parts} part(s) • ${selectedMember.email || 'Email non spécifié'}`;
+                if (chatInput) chatInput.disabled = false;
+                if (chatSendBtn) chatSendBtn.disabled = false;
+
+                const memberMsgs = allMsgs.filter(msg => String(msg.memberId) === String(selectedMember.id));
+                if (adminChatMessages) {
+                    adminChatMessages.innerHTML = '';
+                    if (memberMsgs.length > 0) {
+                        memberMsgs.forEach(m => {
+                            const isAdminMsg = m.sender === 'admin';
+                            const bubble = document.createElement('div');
+                            bubble.style.maxWidth = '75%';
+                            bubble.style.alignSelf = isAdminMsg ? 'flex-end' : 'flex-start';
+                            bubble.style.background = isAdminMsg ? 'var(--primary-color)' : '#edf2f7';
+                            bubble.style.color = isAdminMsg ? 'white' : '#2d3748';
+                            bubble.style.padding = '10px 14px';
+                            bubble.style.borderRadius = isAdminMsg ? '12px 12px 2px 12px' : '12px 12px 12px 2px';
+                            bubble.style.boxShadow = '0 1px 2px rgba(0,0,0,0.08)';
+
+                            const timeStr = new Date(m.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                            bubble.innerHTML = `
+                                <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">${isAdminMsg ? 'Vous (Admin)' : selectedMember.nom} • ${timeStr}</div>
+                                <div style="font-size: 0.95rem; line-height: 1.4; word-break: break-word;">${m.text}</div>
+                            `;
+                            adminChatMessages.appendChild(bubble);
+                        });
+                        adminChatMessages.scrollTop = adminChatMessages.scrollHeight;
+                    } else {
+                        adminChatMessages.innerHTML = '<div class="text-center text-muted" style="margin-top: 60px;">Écrivez ci-dessous pour envoyer un message à ce membre.</div>';
+                    }
+                }
+            } else {
+                if (chatHeaderName) chatHeaderName.textContent = 'Sélectionnez un membre';
+                if (chatHeaderInfo) chatHeaderInfo.textContent = 'Cliquez sur un membre à gauche pour lire et répondre.';
+                if (chatInput) { chatInput.disabled = true; chatInput.value = ''; }
+                if (chatSendBtn) chatSendBtn.disabled = true;
+                if (adminChatMessages) adminChatMessages.innerHTML = '<div class="text-center text-muted" style="margin-top: 60px;">👈 Sélectionnez une conversation dans la liste de gauche pour afficher les messages.</div>';
+            }
+        }
+    };
+
+    // Chat Forms Event Handlers
+    const userChatForm = document.getElementById('user-chat-form');
+    if (userChatForm) {
+        userChatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('user-chat-input');
+            const text = input ? input.value.trim() : '';
+
+            if (text && currentUser && currentUser.role !== 'admin') {
+                if (!state.messages) state.messages = [];
+                const newMsg = {
+                    id: Date.now().toString(),
+                    memberId: currentUser.id,
+                    sender: 'user',
+                    senderName: currentUser.nom,
+                    text: text,
+                    timestamp: new Date().toISOString(),
+                    readByAdmin: false,
+                    readByUser: true
+                };
+                state.messages.push(newMsg);
+                saveState();
+                renderAll();
+                if (input) input.value = '';
+            }
+        });
+    }
+
+    const adminChatForm = document.getElementById('admin-chat-form');
+    if (adminChatForm) {
+        adminChatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('admin-chat-input');
+            const text = input ? input.value.trim() : '';
+
+            if (text && selectedAdminChatMemberId) {
+                if (!state.messages) state.messages = [];
+                const newMsg = {
+                    id: Date.now().toString(),
+                    memberId: selectedAdminChatMemberId,
+                    sender: 'admin',
+                    senderName: 'Admin ZUBIKS',
+                    text: text,
+                    timestamp: new Date().toISOString(),
+                    readByAdmin: true,
+                    readByUser: false
+                };
+                state.messages.push(newMsg);
+
+                // Add notification to member account
+                const targetMember = state.members.find(m => String(m.id) === String(selectedAdminChatMemberId));
+                if (targetMember) {
+                    if (!targetMember.notifications) targetMember.notifications = [];
+                    targetMember.notifications.push({
+                        id: Date.now().toString(),
+                        message: `💬 Nouveau message de l'administrateur : "${text.length > 50 ? text.substring(0, 50) + '...' : text}"`,
+                        date: new Date().toISOString(),
+                        read: false
+                    });
+                }
+
+                saveState();
+                renderAll();
+                if (input) input.value = '';
+            }
+        });
+    }
 
     let currentOperationMemberId = null;
     let currentOperationType = null;
@@ -1084,10 +1409,18 @@ document.addEventListener('DOMContentLoaded', () => {
     window.deleteMember = (id) => {
         const member = state.members.find(m => String(m.id) === String(id));
         if (member && confirm(`Voulez-vous vraiment supprimer le membre "${member.nom}" ?`)) {
+            if (!state.deletedMembers) state.deletedMembers = [];
+            state.deletedMembers.push({
+                id: member.id,
+                email: (member.email || '').toLowerCase(),
+                nom: member.nom,
+                deletedAt: new Date().toISOString()
+            });
+
             state.members = state.members.filter(m => String(m.id) !== String(id));
             saveState();
             renderAll();
-            showToast('Membre supprimé.', 'success');
+            showToast('Membre supprimé avec succès.', 'success');
         }
     };
 
@@ -1213,7 +1546,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             state = importedState;
                             if (!state.credentials) {
                                 state.credentials = {
-                                    email: 'Obedtechn02@gmail.com',
+                                    email: 'zubiksservice@gmail.com',
                                     password: 'Zubiks@2000'
                                 };
                             }
@@ -1320,7 +1653,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Reset to empty state template while keeping rules and credentials
                     const currentReglements = state.reglements || "";
                     const currentCredentials = state.credentials || {
-                        email: 'Obedtechn02@gmail.com',
+                        email: 'zubiksservice@gmail.com',
                         password: 'Zubiks@2000'
                     };
                     state = {
@@ -1384,11 +1717,37 @@ document.addEventListener('DOMContentLoaded', () => {
                     showToast(data.error || "Erreur lors de la mise à jour.", "error");
                     return;
                 }
+
+                if (!state.credentials) state.credentials = {};
+                state.credentials.email = newEmail;
+                state.credentials.password = newPassword;
+
+                if (currentUser && currentUser.role === 'admin') {
+                    currentUser.email = newEmail;
+                    saveActiveSession(currentUser);
+                }
+
+                await saveState();
+
                 showToast("Identifiants de connexion mis à jour avec succès !", "success");
                 document.getElementById('change-password').value = '';
             } catch (err) {
+                const lowerNewEmail = newEmail.toLowerCase();
+                const existingMember = state.members.find(m => (m.email || '').toLowerCase() === lowerNewEmail);
+                if (existingMember) {
+                    showToast("Cette adresse email est déjà utilisée par un membre.", "error");
+                    return;
+                }
+
                 if (!state.credentials) state.credentials = {};
                 state.credentials.email = newEmail;
+                state.credentials.password = newPassword;
+
+                if (currentUser && currentUser.role === 'admin') {
+                    currentUser.email = newEmail;
+                    saveActiveSession(currentUser);
+                }
+
                 saveState();
                 showToast("Identifiants de connexion mis à jour (mode local) !", "success");
                 document.getElementById('change-password').value = '';
@@ -1439,11 +1798,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (savedSession) {
             try {
                 const sess = JSON.parse(savedSession);
+                
+                // Auto-migrate session email if it's the old admin email
+                if (sess.email && sess.email.toLowerCase() === 'obedtechn02@gmail.com') {
+                    sess.email = 'zubiksservice@gmail.com';
+                }
+
                 if (sess.role === 'admin') {
                     currentUser = {
                         role: 'admin',
                         nom: 'Admin ZUBIKS',
-                        email: (state.credentials && state.credentials.email) ? state.credentials.email : 'Obedtechn02@gmail.com'
+                        email: (state.credentials && state.credentials.email) ? state.credentials.email : 'zubiksservice@gmail.com'
                     };
                 } else if (sess.id || sess.email) {
                     const userMatch = state.members.find(m => String(m.id) === String(sess.id) || (m.email && m.email.toLowerCase() === (sess.email || '').toLowerCase()));
@@ -1458,6 +1823,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (currentUser) {
+                    // Auto-migrate currentUser email if it's the old admin email
+                    if (currentUser.email && currentUser.email.toLowerCase() === 'obedtechn02@gmail.com') {
+                        currentUser.email = 'zubiksservice@gmail.com';
+                    }
                     switchRoleView();
                     if (loginScreen) loginScreen.classList.remove('active');
                     if (dashboardScreen) dashboardScreen.classList.add('active');
