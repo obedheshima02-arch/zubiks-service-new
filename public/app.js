@@ -253,14 +253,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnShowLogin && btnShowRegister) {
         btnShowLogin.addEventListener('click', () => {
             btnShowLogin.classList.add('active');
-            btnShowLogin.style.background = 'white';
-            btnShowLogin.style.color = 'var(--primary-color)';
-            btnShowLogin.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-
+            btnShowLogin.removeAttribute('style');
             btnShowRegister.classList.remove('active');
-            btnShowRegister.style.background = 'transparent';
-            btnShowRegister.style.color = 'var(--text-muted)';
-            btnShowRegister.style.boxShadow = 'none';
+            btnShowRegister.removeAttribute('style');
 
             loginFormWrapper.style.display = 'block';
             registerFormWrapper.style.display = 'none';
@@ -268,14 +263,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         btnShowRegister.addEventListener('click', () => {
             btnShowRegister.classList.add('active');
-            btnShowRegister.style.background = 'white';
-            btnShowRegister.style.color = 'var(--primary-color)';
-            btnShowRegister.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-
+            btnShowRegister.removeAttribute('style');
             btnShowLogin.classList.remove('active');
-            btnShowLogin.style.background = 'transparent';
-            btnShowLogin.style.color = 'var(--text-muted)';
-            btnShowLogin.style.boxShadow = 'none';
+            btnShowLogin.removeAttribute('style');
 
             registerFormWrapper.style.display = 'block';
             loginFormWrapper.style.display = 'none';
