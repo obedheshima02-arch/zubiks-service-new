@@ -66,6 +66,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const validateOperationBtn = document.getElementById('validate-operation-btn');
     const modalOperationTitle = document.getElementById('modal-operation-title');
     const modalAmountLabel = document.getElementById('modal-amount-label');
+    const editMemberModal = document.getElementById('edit-member-modal');
+    const memberDetailsModal = document.getElementById('member-details-modal');
 
     // --- State Management ---
     let currentUser = null; // { role: 'admin' | 'user', ... }
@@ -86,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
         messages: [], // [{ id, memberId, sender, senderName, text, timestamp, readByAdmin, readByUser }]
         credentials: {
             email: 'zubiksservice@gmail.com',
-            password: 'Zubiks@2000'
+            password: 'ZUBA2026'
         }
     };
 
@@ -120,8 +122,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     state.argentDebut = parsed.argentDebut !== undefined ? parsed.argentDebut : 0;
                     state.credentials = parsed.credentials || {
                         email: 'zubiksservice@gmail.com',
-                        password: 'Zubiks@2000'
+                        password: localStorage.getItem('zubiks_admin_pwd') || 'ZUBA2026'
                     };
+                    if (localStorage.getItem('zubiks_admin_pwd')) {
+                        state.credentials.password = localStorage.getItem('zubiks_admin_pwd');
+                    }
 
                     // Auto-migrate stale admin email
                     if (state.credentials && state.credentials.email && state.credentials.email.toLowerCase() === 'obedtechn02@gmail.com') {
@@ -179,8 +184,11 @@ document.addEventListener('DOMContentLoaded', () => {
             state.argentDebut = parsed.argentDebut !== undefined ? parsed.argentDebut : 0;
             state.credentials = parsed.credentials || {
                 email: 'zubiksservice@gmail.com',
-                password: 'Zubiks@2000'
+                password: localStorage.getItem('zubiks_admin_pwd') || 'ZUBA2026'
             };
+            if (localStorage.getItem('zubiks_admin_pwd')) {
+                state.credentials.password = localStorage.getItem('zubiks_admin_pwd');
+            }
 
             // Auto-migrate stale admin email
             if (state.credentials && state.credentials.email && state.credentials.email.toLowerCase() === 'obedtechn02@gmail.com') {
@@ -418,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : 'zubiksservice@gmail.com';
-            const targetAdminPassword = (state.credentials && state.credentials.password) ? state.credentials.password : 'Zubiks@2000';
+            const targetAdminPassword = (state.credentials && state.credentials.password) ? state.credentials.password : (localStorage.getItem('zubiks_admin_pwd') || 'ZUBA2026');
 
             if (email === targetAdminEmail) {
                 if (password === targetAdminPassword) {
@@ -1611,7 +1619,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (!state.credentials) {
                                 state.credentials = {
                                     email: 'zubiksservice@gmail.com',
-                                    password: 'Zubiks@2000'
+                                    password: 'ZUBA2026'
                                 };
                             }
                             saveState();
@@ -1706,19 +1714,40 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Reset Database Logic ---
     const resetDatabaseBtn = document.getElementById('reset-database-btn');
     if (resetDatabaseBtn) {
-        resetDatabaseBtn.addEventListener('click', () => {
+        resetDatabaseBtn.addEventListener('click', async () => {
             const doubleConfirm = confirm("⚠️ ATTENTION : Êtes-vous sûr de vouloir réinitialiser COMPLÈTEMENT toutes les données ?\n\nCette action supprimera définitivement tous les membres, les transactions et tous les historiques d'archives.");
             
             if (doubleConfirm) {
                 const passwordConfirm = prompt("Sécurité : Veuillez entrer le mot de passe administrateur pour confirmer la réinitialisation :");
+                if (passwordConfirm === null) return;
                 
-                const targetPassword = (state.credentials && state.credentials.password) ? state.credentials.password : 'Zubiks@2000';
-                if (passwordConfirm === targetPassword) {
-                    // Reset to empty state template while keeping rules and credentials
+                let isPasswordValid = false;
+                const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email : 'zubiksservice@gmail.com';
+
+                try {
+                    const res = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: adminEmail, password: passwordConfirm })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success && data.user && data.user.role === 'admin') {
+                        isPasswordValid = true;
+                    }
+                } catch (err) {
+                    const targetPassword = (state.credentials && state.credentials.password) ? state.credentials.password : (localStorage.getItem('zubiks_admin_pwd') || 'ZUBA2026');
+                    if (passwordConfirm === targetPassword) {
+                        isPasswordValid = true;
+                    }
+                }
+
+                if (isPasswordValid) {
+                    // Reset to empty state template with default ZUBA2026 password
                     const currentReglements = state.reglements || "";
-                    const currentCredentials = state.credentials || {
-                        email: 'zubiksservice@gmail.com',
-                        password: 'Zubiks@2000'
+                    localStorage.removeItem('zubiks_admin_pwd');
+                    const currentCredentials = {
+                        email: adminEmail,
+                        password: 'ZUBA2026'
                     };
                     state = {
                         members: [],
@@ -1731,12 +1760,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         archives: [],
                         dailyArchives: [],
                         transactions: [],
+                        deletedMembers: [],
+                        messages: [],
                         credentials: currentCredentials
                     };
                     
                     saveState();
                     renderAll();
-                    showToast("Toutes les données ont été réinitialisées avec succès.", "success");
+                    showToast("Toutes les données ont été réinitialisées avec succès. Le mot de passe administrateur par défaut a été réinitialisé à ZUBA2026.", "success");
                     
                     // Force refresh rules text area value
                     const textarea = document.querySelector('.modern-textarea');
@@ -1747,7 +1778,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (changeEmailInput) {
                         changeEmailInput.value = currentCredentials.email;
                     }
-                } else if (passwordConfirm !== null) {
+                } else {
                     showToast("Mot de passe incorrect. Réinitialisation annulée.", "error");
                 }
             }
@@ -1764,6 +1795,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!newEmail || !newPassword) {
                 showToast("Veuillez remplir tous les champs.", "error");
+                return;
+            }
+
+            if (newPassword.length < 4) {
+                showToast("Le mot de passe doit contenir au moins 4 caractères.", "error");
                 return;
             }
 
@@ -1785,6 +1821,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!state.credentials) state.credentials = {};
                 state.credentials.email = newEmail;
                 state.credentials.password = newPassword;
+                localStorage.setItem('zubiks_admin_pwd', newPassword);
 
                 if (currentUser && currentUser.role === 'admin') {
                     currentUser.email = newEmail;
@@ -1806,6 +1843,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!state.credentials) state.credentials = {};
                 state.credentials.email = newEmail;
                 state.credentials.password = newPassword;
+                localStorage.setItem('zubiks_admin_pwd', newPassword);
 
                 if (currentUser && currentUser.role === 'admin') {
                     currentUser.email = newEmail;
