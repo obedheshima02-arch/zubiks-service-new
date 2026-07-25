@@ -34,7 +34,7 @@ const DEFAULT_STATE = {
   messages: [],
   credentials: {
     email: "zubiksservice@gmail.com",
-    passwordHash: bcrypt.hashSync("ZUBA2026", 10)
+    passwordHash: bcrypt.hashSync("Zubiks@2000", 10)
   }
 };
 
@@ -145,7 +145,7 @@ app.post('/api/auth/login', (req, res) => {
       delete state.credentials.password;
       saveStateToDisk(state);
     } else {
-      isAdminMatch = (password === "ZUBA2026");
+      isAdminMatch = (password === "Zubiks@2000");
     }
 
     if (isAdminMatch) {
@@ -259,10 +259,6 @@ app.post('/api/auth/credentials', authenticateToken, requireAdmin, (req, res) =>
   const { newEmail, newPassword } = req.body || {};
   if (!newEmail || !newPassword) {
     return res.status(400).json({ error: "Veuillez fournir le nouvel email et mot de passe." });
-  }
-
-  if (newPassword.length < 4) {
-    return res.status(400).json({ error: "Le mot de passe doit contenir au moins 4 caractères." });
   }
 
   const state = loadStateFromDisk();
