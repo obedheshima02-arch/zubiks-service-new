@@ -1770,3 +1770,26 @@ button {
         border-radius: 20px !important;
     }
 }
+
+/* Forgot & Reset Password Styles */
+.auth-link-forgot {
+    background: none;
+    border: none;
+    color: var(--primary-color, #2563eb);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    transition: color 0.2s ease;
+    padding: 0;
+}
+
+.auth-link-forgot:hover {
+    color: #1d4ed8;
+}
+
+.btn-forgot-submit,
+.btn-reset-submit {
+    margin-top: 15px;
+    width: 100%;
+}

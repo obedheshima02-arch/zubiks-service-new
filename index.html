@@ -113,6 +113,11 @@
                                 <input type="password" id="password" placeholder="••••••••" required>
                             </div>
                         </div>
+                        <div class="forgot-link-wrapper" style="text-align: right; margin-top: 6px; margin-bottom: 15px;">
+                            <button type="button" id="link-forgot-password" class="auth-link-forgot">
+                                Mot de passe oublié ?
+                            </button>
+                        </div>
                         <button type="submit" class="btn-primary btn-login-submit">
                             <span>Se Connecter</span>
                             <span class="arrow">→</span>
@@ -192,6 +197,72 @@
                         </div>
                         <p class="text-muted text-center mt-10" style="font-size: 0.82rem; line-height: 1.4;">💡 Après l'inscription, l'administrateur validera le nombre de vos parts pour activer votre compte.
                         </p>
+                    </form>
+                </div>
+
+                <!-- Formulaire Mot de passe oublié -->
+                <div id="forgot-password-wrapper" style="display: none;">
+                    <button id="btn-forgot-to-login" type="button" class="btn-back-link">
+                        ← Retour à la connexion
+                    </button>
+                    <form id="forgot-password-form">
+                        <div class="input-group">
+                            <label for="forgot-email">Votre adresse email</label>
+                            <div class="input-with-icon">
+                                <span class="input-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                        <polyline points="22,6 12,13 2,6"></polyline>
+                                    </svg>
+                                </span>
+                                <input type="email" id="forgot-email" placeholder="votre.email@exemple.com" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary btn-forgot-submit">
+                            <span>Envoyer le lien de réinitialisation</span>
+                            <span class="arrow">→</span>
+                        </button>
+                        <p class="text-muted text-center mt-10" style="font-size: 0.82rem; line-height: 1.4;">
+                            💡 Un lien de réinitialisation temporaire sera envoyé à cette adresse.
+                        </p>
+                    </form>
+                </div>
+
+                <!-- Formulaire Réinitialisation du mot de passe -->
+                <div id="reset-password-wrapper" style="display: none;">
+                    <button id="btn-reset-to-login" type="button" class="btn-back-link">
+                        ← Annuler et se connecter
+                    </button>
+                    <form id="reset-password-form">
+                        <input type="hidden" id="reset-token-input">
+                        <div class="input-group">
+                            <label for="reset-new-password">Nouveau mot de passe</label>
+                            <div class="input-with-icon">
+                                <span class="input-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                    </svg>
+                                </span>
+                                <input type="password" id="reset-new-password" placeholder="••••••••" required minlength="6">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="reset-confirm-password">Confirmer le nouveau mot de passe</label>
+                            <div class="input-with-icon">
+                                <span class="input-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                    </svg>
+                                </span>
+                                <input type="password" id="reset-confirm-password" placeholder="••••••••" required minlength="6">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary btn-reset-submit">
+                            <span>Réinitialiser mon mot de passe</span>
+                            <span class="arrow">→</span>
+                        </button>
                     </form>
                 </div>
 

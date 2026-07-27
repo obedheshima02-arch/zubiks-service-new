@@ -249,6 +249,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnShowRegister = document.getElementById('btn-show-register');
     const loginFormWrapper = document.getElementById('login-form-wrapper');
     const registerFormWrapper = document.getElementById('register-form-wrapper');
+    const forgotPasswordWrapper = document.getElementById('forgot-password-wrapper');
+    const resetPasswordWrapper = document.getElementById('reset-password-wrapper');
+
+    const linkForgotPassword = document.getElementById('link-forgot-password');
+    const btnForgotToLogin = document.getElementById('btn-forgot-to-login');
+    const btnResetToLogin = document.getElementById('btn-reset-to-login');
+
+    const hideAllAuthForms = () => {
+        if (loginFormWrapper) loginFormWrapper.style.display = 'none';
+        if (registerFormWrapper) registerFormWrapper.style.display = 'none';
+        if (forgotPasswordWrapper) forgotPasswordWrapper.style.display = 'none';
+        if (resetPasswordWrapper) resetPasswordWrapper.style.display = 'none';
+    };
 
     if (btnShowLogin && btnShowRegister) {
         btnShowLogin.addEventListener('click', () => {
@@ -257,8 +270,8 @@ document.addEventListener('DOMContentLoaded', () => {
             btnShowRegister.classList.remove('active');
             btnShowRegister.removeAttribute('style');
 
-            loginFormWrapper.style.display = 'block';
-            registerFormWrapper.style.display = 'none';
+            hideAllAuthForms();
+            if (loginFormWrapper) loginFormWrapper.style.display = 'block';
         });
 
         btnShowRegister.addEventListener('click', () => {
@@ -267,8 +280,8 @@ document.addEventListener('DOMContentLoaded', () => {
             btnShowLogin.classList.remove('active');
             btnShowLogin.removeAttribute('style');
 
-            registerFormWrapper.style.display = 'block';
-            loginFormWrapper.style.display = 'none';
+            hideAllAuthForms();
+            if (registerFormWrapper) registerFormWrapper.style.display = 'block';
         });
 
         const btnBackToLogin = document.getElementById('btn-back-to-login');
@@ -281,6 +294,122 @@ document.addEventListener('DOMContentLoaded', () => {
             linkBackToLogin.addEventListener('click', () => btnShowLogin.click());
         }
     }
+
+    if (linkForgotPassword) {
+        linkForgotPassword.addEventListener('click', (e) => {
+            e.preventDefault();
+            hideAllAuthForms();
+            if (forgotPasswordWrapper) forgotPasswordWrapper.style.display = 'block';
+        });
+    }
+
+    if (btnForgotToLogin) {
+        btnForgotToLogin.addEventListener('click', () => btnShowLogin.click());
+    }
+
+    if (btnResetToLogin) {
+        btnResetToLogin.addEventListener('click', () => btnShowLogin.click());
+    }
+
+    // Formulaire Mot de Passe Oublié (Forgot Password)
+    const forgotPasswordForm = document.getElementById('forgot-password-form');
+    if (forgotPasswordForm) {
+        forgotPasswordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const emailInput = document.getElementById('forgot-email');
+            const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
+
+            if (!email) {
+                showToast("Veuillez saisir votre adresse email.", "error");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    showToast(data.error || "Erreur lors de la demande de réinitialisation.", "error");
+                    return;
+                }
+                showToast(data.message || "Un e-mail de réinitialisation a été envoyé.", "success");
+                forgotPasswordForm.reset();
+                if (btnShowLogin) btnShowLogin.click();
+            } catch (err) {
+                console.error("Erreur forgot-password API :", err);
+                showToast("Impossible de joindre le serveur. Vérifiez votre connexion.", "error");
+            }
+        });
+    }
+
+    // Formulaire Réinitialisation de Mot de Passe (Reset Password)
+    const resetPasswordForm = document.getElementById('reset-password-form');
+    const resetTokenInput = document.getElementById('reset-token-input');
+    if (resetPasswordForm) {
+        resetPasswordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = resetTokenInput ? resetTokenInput.value.trim() : '';
+            const newPassword = document.getElementById('reset-new-password').value;
+            const confirmPassword = document.getElementById('reset-confirm-password').value;
+
+            if (!token) {
+                showToast("Jeton de réinitialisation manquant ou invalide.", "error");
+                return;
+            }
+            if (!newPassword || newPassword.length < 6) {
+                showToast("Le nouveau mot de passe doit contenir au moins 6 caractères.", "error");
+                return;
+            }
+            if (newPassword !== confirmPassword) {
+                showToast("Les mots de passe ne correspondent pas.", "error");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/auth/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token, newPassword })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    showToast(data.error || "Erreur lors de la réinitialisation.", "error");
+                    return;
+                }
+                showToast(data.message || "Mot de passe réinitialisé avec succès !", "success");
+                resetPasswordForm.reset();
+                if (window.history && window.history.replaceState) {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+                if (btnShowLogin) btnShowLogin.click();
+            } catch (err) {
+                console.error("Erreur reset-password API :", err);
+                showToast("Erreur de connexion au serveur.", "error");
+            }
+        });
+    }
+
+    // Détection automatique d'un resetToken dans l'URL à l'ouverture de la page
+    const checkUrlResetToken = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        let token = urlParams.get('resetToken') || urlParams.get('token');
+        if (!token && window.location.hash) {
+            const hash = window.location.hash.substring(1);
+            const hashParams = new URLSearchParams(hash);
+            token = hashParams.get('resetToken') || hashParams.get('token');
+        }
+        if (token) {
+            hideAllAuthForms();
+            if (resetPasswordWrapper) resetPasswordWrapper.style.display = 'block';
+            if (resetTokenInput) resetTokenInput.value = token;
+            showToast("Lien de réinitialisation détecté. Veuillez choisir votre nouveau mot de passe.", "info");
+        }
+    };
+
+    checkUrlResetToken();
 
     // Formulaire d'inscription Utilisateur
     const registerForm = document.getElementById('register-form');
@@ -321,9 +450,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (loginPasswordInput) setTimeout(() => loginPasswordInput.focus(), 150);
             } catch (err) {
                 console.error("Erreur inscription API, fallback local :", err);
-                const lowerEmail = email.toLowerCase();
-                const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : 'zubiksservice@gmail.com';
-                const existing = state.members.find(m => (m.email || '').toLowerCase() === lowerEmail);
+                const lowerEmail = email.trim().toLowerCase();
+                const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : 'zubiksservice@gmail.com';
+                const existing = state.members.find(m => (m.email || '').trim().toLowerCase() === lowerEmail);
 
                 if (existing || lowerEmail === targetAdminEmail) {
                     showToast("Cette adresse email est déjà enregistrée.", "error");
@@ -347,7 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     notifications: [{ id: Date.now().toString(), message: "Bienvenue sur ZUBIX SERVICE !", date: new Date().toISOString(), read: false }]
                 };
                 if (state.deletedMembers) {
-                    state.deletedMembers = state.deletedMembers.filter(d => (d.email || '').toLowerCase() !== lowerEmail);
+                    state.deletedMembers = state.deletedMembers.filter(d => (d.email || '').trim().toLowerCase() !== lowerEmail);
                 }
                 state.members.push(newUser);
                 saveState();
@@ -400,17 +529,19 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error("Erreur de connexion serveur, fallback local :", err);
 
+            const lowerEmail = email.trim().toLowerCase();
+
             // Check if email belongs to a deleted account
-            const isDeletedLocal = (state.deletedMembers || []).some(d => (d.email || '').toLowerCase() === email);
+            const isDeletedLocal = (state.deletedMembers || []).some(d => (d.email || '').trim().toLowerCase() === lowerEmail);
             if (isDeletedLocal) {
                 showToast('Votre compte a été supprimé par l\'administrateur.', 'error');
                 return;
             }
 
-            const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : 'zubiksservice@gmail.com';
+            const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : 'zubiksservice@gmail.com';
             const targetAdminPassword = (state.credentials && state.credentials.password) ? state.credentials.password : 'Zubiks@2000';
 
-            if (email === targetAdminEmail) {
+            if (lowerEmail === targetAdminEmail) {
                 if (password === targetAdminPassword) {
                     currentUser = { role: 'admin', nom: 'Admin ZUBIKS', email: targetAdminEmail };
                     saveActiveSession(currentUser);
@@ -426,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const userMatch = state.members.find(m => (m.email || '').toLowerCase() === email && m.password === password);
+            const userMatch = state.members.find(m => (m.email || '').trim().toLowerCase() === lowerEmail && m.password === password);
             if (userMatch) {
                 currentUser = userMatch;
                 saveActiveSession(currentUser);

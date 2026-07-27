@@ -2,8 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const emailService = require('./email');
 
 const app = express();
 
@@ -55,12 +57,34 @@ function loadStateFromDisk() {
       }
       
       // Auto-migrate stale admin email on server database load
-      if (parsed.credentials && parsed.credentials.email && parsed.credentials.email.toLowerCase() === 'obedtechn02@gmail.com') {
+      if (parsed.credentials && parsed.credentials.email && parsed.credentials.email.trim().toLowerCase() === 'obedtechn02@gmail.com') {
         parsed.credentials.email = 'zubiksservice@gmail.com';
         try {
           fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
         } catch (writeErr) {
           console.error("Erreur d'écriture lors de la migration de l'email admin :", writeErr);
+        }
+      }
+
+      // Auto-migrate any unhashed member passwords and normalize emails
+      if (Array.isArray(parsed.members)) {
+        let migrationNeeded = false;
+        parsed.members.forEach(m => {
+          if (!m.passwordHash && m.password) {
+            m.passwordHash = bcrypt.hashSync(m.password, 10);
+            delete m.password;
+            migrationNeeded = true;
+          }
+          if (m.email) {
+            m.email = m.email.trim().toLowerCase();
+          }
+        });
+        if (migrationNeeded) {
+          try {
+            fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+          } catch (writeErr) {
+            console.error("Erreur d'écriture lors de la migration des mots de passe membres :", writeErr);
+          }
         }
       }
       
@@ -76,7 +100,7 @@ function loadStateFromDisk() {
 }
 
 function saveStateToDisk(newState) {
-  memoryState = { ...newState };
+  memoryState = JSON.parse(JSON.stringify(newState));
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(newState, null, 2), 'utf8');
   } catch (err) {
@@ -132,7 +156,7 @@ app.post('/api/auth/login', (req, res) => {
   const lowerEmail = email.trim().toLowerCase();
 
   // Check Admin credentials
-  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : "zubiksservice@gmail.com";
+  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : "zubiksservice@gmail.com";
   let isAdminMatch = false;
 
   if (lowerEmail === adminEmail) {
@@ -162,13 +186,13 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   // Check if account was deleted
-  const isDeleted = (state.deletedMembers || []).some(d => (d.email || '').toLowerCase() === lowerEmail);
+  const isDeleted = (state.deletedMembers || []).some(d => (d.email || '').trim().toLowerCase() === lowerEmail);
   if (isDeleted) {
     return res.status(403).json({ error: "Votre compte a été supprimé." });
   }
 
   // Check Member User credentials
-  const member = (state.members || []).find(m => (m.email || '').toLowerCase() === lowerEmail);
+  const member = (state.members || []).find(m => (m.email || '').trim().toLowerCase() === lowerEmail);
   if (member) {
     let isMemberMatch = false;
     if (member.passwordHash) {
@@ -210,8 +234,8 @@ app.post('/api/auth/register', (req, res) => {
   const state = loadStateFromDisk();
   const lowerEmail = email.trim().toLowerCase();
 
-  const existing = state.members.find(m => (m.email || '').toLowerCase() === lowerEmail);
-  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : "zubiksservice@gmail.com";
+  const existing = (state.members || []).find(m => (m.email || '').trim().toLowerCase() === lowerEmail);
+  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : "zubiksservice@gmail.com";
 
   if (existing || lowerEmail === adminEmail) {
     return res.status(400).json({ error: "Cette adresse email est déjà enregistrée." });
@@ -245,13 +269,124 @@ app.post('/api/auth/register', (req, res) => {
 
   // Effacer l'email de deletedMembers s'il y figure afin d'autoriser la réinscription
   if (state.deletedMembers) {
-    state.deletedMembers = state.deletedMembers.filter(d => (d.email || '').toLowerCase() !== lowerEmail);
+    state.deletedMembers = state.deletedMembers.filter(d => (d.email || '').trim().toLowerCase() !== lowerEmail);
   }
 
+  if (!state.members) state.members = [];
   state.members.push(newUser);
   saveStateToDisk(state);
 
+  // Trigger welcome email asynchronously
+  emailService.sendWelcomeEmail(lowerEmail, fullName).catch(err => {
+    console.error("Erreur lors de l'envoi de l'email de bienvenue :", err);
+  });
+
   res.json({ success: true, message: "Inscription réussie." });
+});
+
+// API: Auth Forgot Password
+app.post('/api/auth/forgot-password', (req, res) => {
+  const { email } = req.body || {};
+  if (!email) {
+    return res.status(400).json({ error: "Veuillez fournir une adresse email." });
+  }
+
+  const state = loadStateFromDisk();
+  const lowerEmail = email.trim().toLowerCase();
+
+  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : "zubiksservice@gmail.com";
+  const member = (state.members || []).find(m => (m.email || '').trim().toLowerCase() === lowerEmail);
+
+  let targetName = '';
+  if (lowerEmail === adminEmail) {
+    targetName = 'Administrateur ZUBIKS';
+  } else if (member) {
+    targetName = member.nom;
+  } else {
+    return res.status(404).json({ error: "Aucun compte n'est associé à cette adresse email." });
+  }
+
+  // Generate secure random reset token
+  const resetToken = crypto.randomBytes(24).toString('hex');
+  const expiresAt = Date.now() + 3600000; // 1 hour
+
+  if (!state.resetTokens) state.resetTokens = [];
+  state.resetTokens = state.resetTokens.filter(t => (t.email || '').trim().toLowerCase() !== lowerEmail);
+
+  state.resetTokens.push({
+    token: resetToken,
+    email: lowerEmail,
+    expiresAt: expiresAt
+  });
+
+  saveStateToDisk(state);
+
+  const protocol = req.protocol || 'http';
+  const host = req.headers.host || 'localhost:3000';
+  const hostUrl = `${protocol}://${host}`;
+
+  emailService.sendResetPasswordEmail(lowerEmail, targetName, resetToken, hostUrl).catch(err => {
+    console.error("Erreur d'envoi d'e-mail de réinitialisation :", err);
+  });
+
+  res.json({
+    success: true,
+    message: "Un e-mail contenant le lien de réinitialisation a été envoyé.",
+    resetToken: resetToken
+  });
+});
+
+// API: Auth Reset Password
+app.post('/api/auth/reset-password', (req, res) => {
+  const { token, newPassword } = req.body || {};
+  if (!token || !newPassword) {
+    return res.status(400).json({ error: "Le jeton et le nouveau mot de passe sont obligatoires." });
+  }
+
+  const state = loadStateFromDisk();
+  const cleanToken = token.trim();
+
+  const tokenIndex = (state.resetTokens || []).findIndex(t => t.token === cleanToken);
+  if (tokenIndex === -1) {
+    return res.status(400).json({ error: "Jeton de réinitialisation invalide." });
+  }
+
+  const tokenEntry = state.resetTokens[tokenIndex];
+  if (Date.now() > tokenEntry.expiresAt) {
+    state.resetTokens.splice(tokenIndex, 1);
+    saveStateToDisk(state);
+    return res.status(400).json({ error: "Le jeton de réinitialisation a expiré. Veuillez refaire une demande." });
+  }
+
+  const targetEmail = tokenEntry.email.trim().toLowerCase();
+  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : "zubiksservice@gmail.com";
+  const newHash = bcrypt.hashSync(newPassword, 10);
+
+  let updated = false;
+
+  if (targetEmail === adminEmail) {
+    if (!state.credentials) state.credentials = {};
+    state.credentials.passwordHash = newHash;
+    delete state.credentials.password;
+    updated = true;
+  }
+
+  const member = (state.members || []).find(m => (m.email || '').trim().toLowerCase() === targetEmail);
+  if (member) {
+    member.passwordHash = newHash;
+    delete member.password;
+    updated = true;
+  }
+
+  if (!updated) {
+    return res.status(404).json({ error: "Compte introuvable pour cet e-mail." });
+  }
+
+  // Remove used token
+  state.resetTokens.splice(tokenIndex, 1);
+  saveStateToDisk(state);
+
+  res.json({ success: true, message: "Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter." });
 });
 
 // API: Change Admin Credentials
@@ -265,14 +400,14 @@ app.post('/api/auth/credentials', authenticateToken, requireAdmin, (req, res) =>
   const lowerNewEmail = newEmail.trim().toLowerCase();
 
   // Check if new email is already used by a member
-  const existingMember = state.members.find(m => (m.email || '').toLowerCase() === lowerNewEmail);
+  const existingMember = (state.members || []).find(m => (m.email || '').trim().toLowerCase() === lowerNewEmail);
   if (existingMember) {
     return res.status(400).json({ error: "Cette adresse email est déjà utilisée par un membre." });
   }
 
   if (!state.credentials) state.credentials = {};
 
-  state.credentials.email = newEmail.trim();
+  state.credentials.email = lowerNewEmail;
   state.credentials.passwordHash = bcrypt.hashSync(newPassword, 10);
   delete state.credentials.password;
 
@@ -306,9 +441,27 @@ app.post('/api/state', (req, res) => {
 
   if (Array.isArray(newState.members)) {
     newState.members.forEach(m => {
-      const orig = (existingState.members || []).find(o => String(o.id) === String(m.id));
-      if (orig && orig.passwordHash) {
-        m.passwordHash = orig.passwordHash;
+      const orig = (existingState.members || []).find(o => 
+        String(o.id) === String(m.id) || 
+        (o.email && m.email && o.email.trim().toLowerCase() === m.email.trim().toLowerCase())
+      );
+      if (orig) {
+        if (orig.passwordHash) {
+          m.passwordHash = orig.passwordHash;
+        }
+        if (orig.password) {
+          m.password = orig.password;
+        }
+      }
+
+      // Auto-hash any plain text password if passwordHash is missing
+      if (!m.passwordHash && m.password) {
+        m.passwordHash = bcrypt.hashSync(m.password, 10);
+        delete m.password;
+      }
+
+      if (m.email) {
+        m.email = m.email.trim().toLowerCase();
       }
     });
   }

@@ -1,0 +1,86 @@
+{
+  "members": [
+    {
+      "id": "1785154657510",
+      "nom": "Test User",
+      "postnom": "User",
+      "sexe": "Homme",
+      "email": "user.test2026@zubiks.com",
+      "role": "user",
+      "status": "pending",
+      "parts": 0,
+      "totalDepot": 0,
+      "totalRetrait": 0,
+      "dateAjout": "2026-07-27T12:17:37.510Z",
+      "notifications": [
+        {
+          "id": "1785154657518",
+          "message": "Bienvenue sur ZUBIX SERVICE ! Votre compte a été créé avec succès.",
+          "date": "2026-07-27T12:17:37.518Z",
+          "read": false
+        }
+      ],
+      "passwordHash": "$2a$10$3yvc0QGL7KVduiP1HQYave5WJbL9o.kFBXLhw.sJTONPAZEsYJgLu"
+    },
+    {
+      "id": "1785154709091",
+      "nom": "Test User",
+      "postnom": "User",
+      "sexe": "Homme",
+      "email": "user.test1785154708650@zubiks.com",
+      "role": "user",
+      "status": "pending",
+      "parts": 0,
+      "totalDepot": 0,
+      "totalRetrait": 0,
+      "dateAjout": "2026-07-27T12:18:29.091Z",
+      "notifications": [
+        {
+          "id": "1785154709093",
+          "message": "Bienvenue sur ZUBIX SERVICE ! Votre compte a été créé avec succès.",
+          "date": "2026-07-27T12:18:29.093Z",
+          "read": false
+        }
+      ],
+      "passwordHash": "$2a$10$Wt.0W9wYvM4o4ACBsgg1F.MIEmiZiYYSWTREPUxmmaBeW27rsoTE."
+    },
+    {
+      "id": "1785155502112",
+      "nom": "Obed RecoveryTest",
+      "postnom": "RecoveryTest",
+      "sexe": "Homme",
+      "email": "user.recovery1785155501684@zubiks.com",
+      "passwordHash": "$2a$10$Fm2cJkEk9u7Ifgh2GVJnPuY/Y9v.093YC.Hh1iO1jktZgLI7y6xvG",
+      "role": "user",
+      "status": "pending",
+      "parts": 0,
+      "totalDepot": 0,
+      "totalRetrait": 0,
+      "dateAjout": "2026-07-27T12:31:42.112Z",
+      "notifications": [
+        {
+          "id": "1785155502122",
+          "message": "Bienvenue sur ZUBIX SERVICE ! Votre compte a été créé avec succès.",
+          "date": "2026-07-27T12:31:42.122Z",
+          "read": false
+        }
+      ]
+    }
+  ],
+  "dailyDepots": 0,
+  "dailyRetraits": 0,
+  "cycleDepots": 0,
+  "cycleRetraits": 0,
+  "argentDebut": 0,
+  "reglements": "",
+  "archives": [],
+  "dailyArchives": [],
+  "transactions": [],
+  "deletedMembers": [],
+  "messages": [],
+  "credentials": {
+    "email": "zubiksservice@gmail.com",
+    "passwordHash": "$2a$10$QrorWGwlt96ptpbdvyBTF.iYpDLjrDWgkHEVT7uc7FRHOYfXPUJ9."
+  },
+  "resetTokens": []
+}
