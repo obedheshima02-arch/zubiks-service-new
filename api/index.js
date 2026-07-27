@@ -20,9 +20,10 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 // Determine database path safely for Vercel Serverless (/tmp) or Local
+const ROOT_DB_FILE = path.join(__dirname, '..', 'database.json');
 const DB_FILE = process.env.VERCEL
   ? path.join('/tmp', 'database.json')
-  : path.join(__dirname, '..', 'database.json');
+  : ROOT_DB_FILE;
 
 // Default state template with hashed admin password fallback
 const DEFAULT_STATE = {
@@ -49,9 +50,23 @@ let memoryState = null;
 function loadStateFromDisk() {
   if (memoryState) return memoryState;
 
-  if (fs.existsSync(DB_FILE)) {
+  let targetFileToRead = DB_FILE;
+  if (!fs.existsSync(targetFileToRead) && fs.existsSync(ROOT_DB_FILE)) {
     try {
-      const data = fs.readFileSync(DB_FILE, 'utf8');
+      const initialData = fs.readFileSync(ROOT_DB_FILE, 'utf8');
+      if (process.env.VERCEL) {
+        fs.writeFileSync(DB_FILE, initialData, 'utf8');
+      } else {
+        targetFileToRead = ROOT_DB_FILE;
+      }
+    } catch (copyErr) {
+      targetFileToRead = ROOT_DB_FILE;
+    }
+  }
+
+  if (fs.existsSync(targetFileToRead)) {
+    try {
+      const data = fs.readFileSync(targetFileToRead, 'utf8');
       const parsed = JSON.parse(data);
       
       // Ensure admin passwordHash exists
