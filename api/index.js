@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
@@ -7,25 +6,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const emailService = require('./email');
-=======
-let express = null;
-try {
-  express = require('express');
-} catch (e) {
-  const dummyFn = () => ({ use: () => {}, get: () => {}, post: () => {}, listen: () => {} });
-  dummyFn.json = () => (req, res, next) => next && next();
-  express = dummyFn;
-}
-let cors = null;
-let bcrypt = null;
-let jwt = null;
-
-try { cors = require('cors'); } catch (e) { cors = () => (req, res, next) => next(); }
-try { bcrypt = require('bcryptjs'); } catch (e) { bcrypt = { hashSync: (v) => v, compareSync: (v, h) => v === h }; }
-try { jwt = require('jsonwebtoken'); } catch (e) { jwt = { sign: (p) => 'token-' + JSON.stringify(p), verify: (t, s, cb) => cb(null, { id: 'admin-001', role: 'admin' }) }; }
-
 const { getFullState, saveFullState, isPostgresConnected, addAuditLog } = require('../db/index.js');
->>>>>>> 5370e924d0a2fd3a8e01f34617700e76d5a1fd54
 
 const app = express();
 
@@ -38,7 +19,6 @@ const submissionLocks = new Map();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-<<<<<<< HEAD
 // Determine database path safely for Vercel Serverless (/tmp) or Local
 const DB_FILE = process.env.VERCEL
   ? path.join('/tmp', 'database.json')
@@ -132,8 +112,6 @@ function saveStateToDisk(newState) {
   }
 }
 
-=======
->>>>>>> 5370e924d0a2fd3a8e01f34617700e76d5a1fd54
 // Authentication Middleware
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -190,13 +168,8 @@ app.post('/api/auth/login', async (req, res) => {
   const lowerEmail = email.trim().toLowerCase();
   const state = await getFullState();
 
-<<<<<<< HEAD
-  // Check Admin credentials
-  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : "zubiksservice@gmail.com";
-=======
   // 1. Check Admin Credentials
-  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : "zubiksservice@gmail.com";
->>>>>>> 5370e924d0a2fd3a8e01f34617700e76d5a1fd54
+  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : "zubiksservice@gmail.com";
   let isAdminMatch = false;
 
   if (lowerEmail === adminEmail) {
@@ -231,24 +204,14 @@ app.post('/api/auth/login', async (req, res) => {
     }
   }
 
-<<<<<<< HEAD
-  // Check if account was deleted
-  const isDeleted = (state.deletedMembers || []).some(d => (d.email || '').trim().toLowerCase() === lowerEmail);
-=======
   // 2. Check if account was soft deleted
-  const isDeleted = (state.deletedMembers || []).some(d => (d.email || '').toLowerCase() === lowerEmail);
->>>>>>> 5370e924d0a2fd3a8e01f34617700e76d5a1fd54
+  const isDeleted = (state.deletedMembers || []).some(d => (d.email || '').trim().toLowerCase() === lowerEmail);
   if (isDeleted) {
     return res.status(403).json({ error: "Votre compte a été supprimé." });
   }
 
-<<<<<<< HEAD
-  // Check Member User credentials
-  const member = (state.members || []).find(m => (m.email || '').trim().toLowerCase() === lowerEmail);
-=======
   // 3. Check Member User Credentials
-  const member = (state.members || []).find(m => (m.email || '').toLowerCase() === lowerEmail);
->>>>>>> 5370e924d0a2fd3a8e01f34617700e76d5a1fd54
+  const member = (state.members || []).find(m => (m.email || '').trim().toLowerCase() === lowerEmail);
   if (member) {
     let isMemberMatch = false;
     if (member.passwordHash) {
@@ -295,13 +258,8 @@ app.post('/api/auth/register', async (req, res) => {
   const lowerEmail = email.trim().toLowerCase();
   const state = await getFullState();
 
-<<<<<<< HEAD
   const existing = (state.members || []).find(m => (m.email || '').trim().toLowerCase() === lowerEmail);
   const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : "zubiksservice@gmail.com";
-=======
-  const existing = (state.members || []).find(m => (m.email || '').toLowerCase() === lowerEmail);
-  const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.toLowerCase() : "zubiksservice@gmail.com";
->>>>>>> 5370e924d0a2fd3a8e01f34617700e76d5a1fd54
 
   if (existing || lowerEmail === adminEmail) {
     return res.status(400).json({ error: "Cette adresse email est déjà enregistrée." });
@@ -331,11 +289,7 @@ app.post('/api/auth/register', async (req, res) => {
     state.deletedMembers = state.deletedMembers.filter(d => (d.email || '').trim().toLowerCase() !== lowerEmail);
   }
 
-<<<<<<< HEAD
   if (!state.members) state.members = [];
-  state.members.push(newUser);
-  saveStateToDisk(state);
-=======
   state.members.push(newMember);
   await saveFullState(state);
 
@@ -345,7 +299,6 @@ app.post('/api/auth/register', async (req, res) => {
     action: 'INSCRIPTION_UTILISATEUR',
     details: `Nouveau compte créé pour ${fullName} (${lowerEmail})`
   });
->>>>>>> 5370e924d0a2fd3a8e01f34617700e76d5a1fd54
 
   // Trigger welcome email asynchronously
   emailService.sendWelcomeEmail(lowerEmail, fullName).catch(err => {
@@ -356,14 +309,14 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // API: Auth Forgot Password
-app.post('/api/auth/forgot-password', (req, res) => {
+app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body || {};
   if (!email) {
     return res.status(400).json({ error: "Veuillez fournir une adresse email." });
   }
 
-  const state = loadStateFromDisk();
   const lowerEmail = email.trim().toLowerCase();
+  const state = await getFullState();
 
   const adminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : "zubiksservice@gmail.com";
   const member = (state.members || []).find(m => (m.email || '').trim().toLowerCase() === lowerEmail);
@@ -390,7 +343,7 @@ app.post('/api/auth/forgot-password', (req, res) => {
     expiresAt: expiresAt
   });
 
-  saveStateToDisk(state);
+  await saveFullState(state);
 
   const protocol = req.protocol || 'http';
   const host = req.headers.host || 'localhost:3000';
@@ -408,13 +361,13 @@ app.post('/api/auth/forgot-password', (req, res) => {
 });
 
 // API: Auth Reset Password
-app.post('/api/auth/reset-password', (req, res) => {
+app.post('/api/auth/reset-password', async (req, res) => {
   const { token, newPassword } = req.body || {};
   if (!token || !newPassword) {
     return res.status(400).json({ error: "Le jeton et le nouveau mot de passe sont obligatoires." });
   }
 
-  const state = loadStateFromDisk();
+  const state = await getFullState();
   const cleanToken = token.trim();
 
   const tokenIndex = (state.resetTokens || []).findIndex(t => t.token === cleanToken);
@@ -425,7 +378,7 @@ app.post('/api/auth/reset-password', (req, res) => {
   const tokenEntry = state.resetTokens[tokenIndex];
   if (Date.now() > tokenEntry.expiresAt) {
     state.resetTokens.splice(tokenIndex, 1);
-    saveStateToDisk(state);
+    await saveFullState(state);
     return res.status(400).json({ error: "Le jeton de réinitialisation a expiré. Veuillez refaire une demande." });
   }
 
@@ -455,7 +408,7 @@ app.post('/api/auth/reset-password', (req, res) => {
 
   // Remove used token
   state.resetTokens.splice(tokenIndex, 1);
-  saveStateToDisk(state);
+  await saveFullState(state);
 
   res.json({ success: true, message: "Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter." });
 });
@@ -470,21 +423,12 @@ app.post('/api/auth/credentials', authenticateToken, requireAdmin, async (req, r
   const state = await getFullState();
   const lowerNewEmail = newEmail.trim().toLowerCase();
 
-<<<<<<< HEAD
-  // Check if new email is already used by a member
   const existingMember = (state.members || []).find(m => (m.email || '').trim().toLowerCase() === lowerNewEmail);
-=======
-  const existingMember = (state.members || []).find(m => (m.email || '').toLowerCase() === lowerNewEmail);
->>>>>>> 5370e924d0a2fd3a8e01f34617700e76d5a1fd54
   if (existingMember) {
     return res.status(400).json({ error: "Cette adresse email est déjà utilisée par un membre." });
   }
 
   if (!state.credentials) state.credentials = {};
-<<<<<<< HEAD
-
-=======
->>>>>>> 5370e924d0a2fd3a8e01f34617700e76d5a1fd54
   state.credentials.email = lowerNewEmail;
   state.credentials.passwordHash = bcrypt.hashSync(newPassword, 10);
 
@@ -530,37 +474,24 @@ app.post('/api/state', authenticateToken, async (req, res) => {
       newState.credentials = existingState.credentials;
     }
 
-<<<<<<< HEAD
-  if (Array.isArray(newState.members)) {
-    newState.members.forEach(m => {
-      const orig = (existingState.members || []).find(o => 
-        String(o.id) === String(m.id) || 
-        (o.email && m.email && o.email.trim().toLowerCase() === m.email.trim().toLowerCase())
-      );
-      if (orig) {
-        if (orig.passwordHash) {
-          m.passwordHash = orig.passwordHash;
-        }
-        if (orig.password) {
-          m.password = orig.password;
-        }
-      }
-
-      // Auto-hash any plain text password if passwordHash is missing
-      if (!m.passwordHash && m.password) {
-        m.passwordHash = bcrypt.hashSync(m.password, 10);
-        delete m.password;
-      }
-
-      if (m.email) {
-        m.email = m.email.trim().toLowerCase();
-      }
-=======
     if (Array.isArray(newState.members)) {
       newState.members.forEach(m => {
-        const orig = (existingState.members || []).find(o => String(o.id) === String(m.id));
-        if (orig && orig.passwordHash) {
-          m.passwordHash = orig.passwordHash;
+        const orig = (existingState.members || []).find(o => 
+          String(o.id) === String(m.id) || 
+          (o.email && m.email && o.email.trim().toLowerCase() === m.email.trim().toLowerCase())
+        );
+        if (orig) {
+          if (orig.passwordHash) m.passwordHash = orig.passwordHash;
+          if (orig.password) m.password = orig.password;
+        }
+
+        if (!m.passwordHash && m.password) {
+          m.passwordHash = bcrypt.hashSync(m.password, 10);
+          delete m.password;
+        }
+
+        if (m.email) {
+          m.email = m.email.trim().toLowerCase();
         }
       });
     }
@@ -618,7 +549,6 @@ app.post('/api/members', authenticateToken, requireAdmin, async (req, res) => {
       recordId: newMember.id,
       newVal: newMember,
       details: `Création du membre ${newMember.nom} avec ${newMember.parts} parts`
->>>>>>> 5370e924d0a2fd3a8e01f34617700e76d5a1fd54
     });
 
     res.json({ success: true, member: newMember });

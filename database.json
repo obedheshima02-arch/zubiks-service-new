@@ -1,7 +1,6 @@
 {
   "members": [
     {
-<<<<<<< HEAD
       "id": "1785154657510",
       "nom": "Test User",
       "postnom": "User",
@@ -63,7 +62,9 @@
           "id": "1785155502122",
           "message": "Bienvenue sur ZUBIX SERVICE ! Votre compte a été créé avec succès.",
           "date": "2026-07-27T12:31:42.122Z",
-      }
+          "read": false
+        }
+      ]
     },
     {
       "id": "test-m1-1785130782746",
@@ -89,7 +90,6 @@
       "status": "active",
       "dateAjout": "2026-07-27T05:39:42.761Z"
     }
-    }
   ],
   "dailyDepots": 0,
   "dailyRetraits": 0,
@@ -99,32 +99,7 @@
   "reglements": "",
   "archives": [],
   "dailyArchives": [],
-<<<<<<< HEAD
-  "transactions": [],
-=======
   "transactions": [
-    {
-      "id": "tx-1-1785131177355",
-      "memberId": "test-m1-1785131177353",
-      "memberName": "Jean Dupont",
-      "type": "depot",
-      "montant": 100,
-      "parts": 5,
-      "date": "2026-07-27T05:46:17.355Z",
-      "modePaiement": "cash",
-      "reference": "REF-DEP-001"
-    },
-    {
-      "id": "tx-1-1785130997474",
-      "memberId": "test-m1-1785130997472",
-      "memberName": "Jean Dupont",
-      "type": "depot",
-      "montant": 100,
-      "parts": 5,
-      "date": "2026-07-27T05:43:17.474Z",
-      "modePaiement": "cash",
-      "reference": "REF-DEP-001"
-    },
     {
       "id": "tx-1-1785130782763",
       "memberId": "test-m1-1785130782746",
@@ -137,17 +112,11 @@
       "reference": "REF-DEP-001"
     }
   ],
->>>>>>> 5370e924d0a2fd3a8e01f34617700e76d5a1fd54
   "deletedMembers": [],
   "messages": [],
   "credentials": {
     "email": "zubiksservice@gmail.com",
-<<<<<<< HEAD
     "passwordHash": "$2a$10$QrorWGwlt96ptpbdvyBTF.iYpDLjrDWgkHEVT7uc7FRHOYfXPUJ9."
   },
   "resetTokens": []
-=======
-    "passwordHash": "Zubiks@2000"
-  }
->>>>>>> 5370e924d0a2fd3a8e01f34617700e76d5a1fd54
 }
