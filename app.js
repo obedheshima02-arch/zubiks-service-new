@@ -140,8 +140,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            // Fetch from dynamic backend API
-            const response = await fetch('/api/state');
+            // Fetch from dynamic backend API with JWT authentication
+            const headers = {};
+            if (currentJwtToken) {
+                headers['Authorization'] = `Bearer ${currentJwtToken}`;
+            }
+            const response = await fetch('/api/state', { headers });
             if (!response.ok) throw new Error("HTTP error " + response.status);
             const parsed = await response.json();
             
