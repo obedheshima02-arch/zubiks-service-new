@@ -140,71 +140,55 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            // Fetch from dynamic backend API with JWT authentication
-            const headers = {};
-            if (currentJwtToken) {
-                headers['Authorization'] = `Bearer ${currentJwtToken}`;
-            }
-            const response = await fetch('/api/state', { headers });
-            if (!response.ok) throw new Error("HTTP error " + response.status);
-            const parsed = await response.json();
-            
-            let serverIsVirgin = (!parsed.archives || parsed.archives.length === 0) &&
-                                 (!parsed.members || parsed.members.length === 0) &&
-                                 (!parsed.transactions || parsed.transactions.length === 0) &&
-                                 (!parsed.reglements || parsed.reglements.trim() === "");
-            
-            if (serverIsVirgin) {
-                // Serveur retourné complètement vierge : vérifier si localStorage contient des données à restaurer/synchroniser
-                const savedState = localStorage.getItem('zubiksStateV2') || localStorage.getItem('zubixStateV2');
-                if (savedState) {
-                    console.log("Base de données serveur vierge, restauration des données du stockage local.");
-                    loadFromLocal();
-                    saveState(); // Synchroniser les données locales vers le serveur
+            if (window.firebaseDb && window.firebaseGetDoc && window.firebaseDoc) {
+                const docRef = window.firebaseDoc(window.firebaseDb, "zubiks", "state");
+                const docSnap = await window.firebaseGetDoc(docRef);
+                
+                if (docSnap.exists()) {
+                    const parsed = docSnap.data();
+                    
+                    state = {
+                        ...state,
+                        ...parsed,
+                    };
+                    state.members = (parsed.members || []).map(m => ({
+                        ...m,
+                        totalDepot: m.totalDepot !== undefined ? m.totalDepot : 0,
+                        totalRetrait: m.totalRetrait || 0
+                    }));
+                    state.archives = parsed.archives || [];
+                    state.dailyArchives = parsed.dailyArchives || [];
+                    state.transactions = parsed.transactions || [];
+                    state.deletedMembers = parsed.deletedMembers || [];
+                    state.messages = parsed.messages || [];
+                    state.argentDebut = parsed.argentDebut !== undefined ? parsed.argentDebut : 0;
+                    state.credentials = parsed.credentials || {
+                        email: 'zubiksservice@gmail.com'
+                    };
+
+                    console.log("Données chargées depuis Firestore.");
+                    // Render rules in rules textarea if present
+                    const textarea = document.querySelector('.modern-textarea');
+                    if (textarea) textarea.value = state.reglements || "";
+
+                    // Populate change credentials email
+                    const changeEmailInput = document.getElementById('change-email');
+                    if (changeEmailInput && state.credentials && state.credentials.email) {
+                        changeEmailInput.value = state.credentials.email;
+                    }
+                    
                     renderAll();
-                    return;
+                } else {
+                    console.log("Aucune donnée trouvée sur Firestore, initialisation depuis le stockage local.");
+                    loadFromLocal();
+                    saveState(); // Initialize Firestore with local data
+                    renderAll();
                 }
+            } else {
+                throw new Error("Firebase non initialisé");
             }
-
-            state = {
-                ...state,
-                ...parsed,
-            };
-            state.members = (parsed.members || []).map(m => ({
-                ...m,
-                totalDepot: m.totalDepot !== undefined ? m.totalDepot : 0,
-                totalRetrait: m.totalRetrait || 0
-            }));
-            state.archives = parsed.archives || [];
-            state.dailyArchives = parsed.dailyArchives || [];
-            state.transactions = parsed.transactions || [];
-            state.deletedMembers = parsed.deletedMembers || [];
-            state.messages = parsed.messages || [];
-            state.argentDebut = parsed.argentDebut !== undefined ? parsed.argentDebut : 0;
-            state.credentials = parsed.credentials || {
-                email: 'zubiksservice@gmail.com',
-                password: 'Zubiks@2000'
-            };
-
-            // Auto-migrate stale admin email
-            if (state.credentials && state.credentials.email && state.credentials.email.toLowerCase() === 'obedtechn02@gmail.com') {
-                state.credentials.email = 'zubiksservice@gmail.com';
-            }
-
-            console.log("Données chargées depuis le serveur dynamique.");
-            // Render rules in rules textarea if present
-            const textarea = document.querySelector('.modern-textarea');
-            if (textarea) textarea.value = state.reglements || "";
-
-            // Populate change credentials email
-            const changeEmailInput = document.getElementById('change-email');
-            if (changeEmailInput && state.credentials && state.credentials.email) {
-                changeEmailInput.value = state.credentials.email;
-            }
-            
-            renderAll();
         } catch (err) {
-            console.warn("Impossible de joindre le serveur dynamique (utilisation du stockage local) :", err);
+            console.warn("Impossible de joindre Firestore (utilisation du stockage local) :", err);
             loadFromLocal();
             renderAll();
         }
@@ -216,21 +200,25 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('zubiksStateV2', JSON.stringify(state));
 
         try {
-            const headers = { 'Content-Type': 'application/json' };
-            if (currentJwtToken) {
-                headers['Authorization'] = `Bearer ${currentJwtToken}`;
+            if (window.firebaseDb && window.firebaseSetDoc && window.firebaseDoc) {
+                const docRef = window.firebaseDoc(window.firebaseDb, "zubiks", "state");
+                // Remove password from state before saving to Firestore for security
+                const stateToSave = JSON.parse(JSON.stringify(state));
+                if (stateToSave.credentials) {
+                    delete stateToSave.credentials.password;
+                    delete stateToSave.credentials.passwordHash;
+                }
+                if (stateToSave.members) {
+                    stateToSave.members.forEach(m => {
+                        delete m.password;
+                        delete m.passwordHash;
+                    });
+                }
+                await window.firebaseSetDoc(docRef, stateToSave);
+                console.log("Données sauvegardées sur Firestore.");
             }
-
-            // Save to dynamic backend API
-            const response = await fetch('/api/state', {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(state)
-            });
-            if (!response.ok) throw new Error("HTTP error " + response.status);
-            console.log("Données sauvegardées sur le serveur dynamique.");
         } catch (err) {
-            console.error("Erreur de sauvegarde sur le serveur dynamique (données conservées localement) :", err);
+            console.error("Erreur de sauvegarde sur Firestore (données conservées localement) :", err);
         }
     };
 
@@ -329,22 +317,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const res = await fetch('/api/auth/forgot-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
-                });
-                const data = await res.json();
-                if (!res.ok || !data.success) {
-                    showToast(data.error || "Erreur lors de la demande de réinitialisation.", "error");
-                    return;
-                }
-                showToast(data.message || "Un e-mail de réinitialisation a été envoyé.", "success");
+                if (!window.firebaseAuth) throw new Error("Firebase non initialisé");
+                await window.firebaseResetPassword(window.firebaseAuth, email);
+                showToast("Un e-mail de réinitialisation a été envoyé si le compte existe.", "success");
                 forgotPasswordForm.reset();
                 if (btnShowLogin) btnShowLogin.click();
             } catch (err) {
-                console.error("Erreur forgot-password API :", err);
-                showToast("Impossible de joindre le serveur. Vérifiez votre connexion.", "error");
+                console.error("Erreur forgot-password Firebase :", err);
+                showToast("Impossible d'envoyer l'e-mail de réinitialisation.", "error");
             }
         });
     }
@@ -373,17 +353,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const res = await fetch('/api/auth/reset-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token, newPassword })
-                });
-                const data = await res.json();
-                if (!res.ok || !data.success) {
-                    showToast(data.error || "Erreur lors de la réinitialisation.", "error");
-                    return;
-                }
-                showToast(data.message || "Mot de passe réinitialisé avec succès !", "success");
+                // Firebase gère la réinitialisation via le lien de l'email, ce formulaire n'est plus utilisé en mode serverless.
+                showToast("La réinitialisation est gérée par le lien reçu par e-mail.", "info");
                 resetPasswordForm.reset();
                 if (window.history && window.history.replaceState) {
                     window.history.replaceState({}, document.title, window.location.pathname);
@@ -391,7 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btnShowLogin) btnShowLogin.click();
             } catch (err) {
                 console.error("Erreur reset-password API :", err);
-                showToast("Erreur de connexion au serveur.", "error");
+                showToast("Erreur de connexion.", "error");
             }
         });
     }
@@ -415,7 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     checkUrlResetToken();
 
-    // Formulaire d'inscription Utilisateur
+    // Formulaire d'Inscription
     const registerForm = document.getElementById('register-form');
     if (registerForm) {
         registerForm.addEventListener('submit', async (e) => {
@@ -432,45 +403,33 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const res = await fetch('/api/auth/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nom, postnom, sexe, email, password })
-                });
-                const data = await res.json();
-                if (!res.ok || !data.success) {
-                    showToast(data.error || "Erreur lors de l'inscription.", "error");
-                    return;
-                }
-
-                await loadState();
-                registerForm.reset();
-                showToast("Création de compte réussie avec succès ! Votre compte est en attente de la validation de vos parts par l'administrateur.", "success");
-                if (btnShowLogin) btnShowLogin.click();
+                if (!window.firebaseAuth) throw new Error("Firebase non initialisé");
                 
-                const loginEmailInput = document.getElementById('email');
-                const loginPasswordInput = document.getElementById('password');
-                if (loginEmailInput) loginEmailInput.value = email;
-                if (loginPasswordInput) setTimeout(() => loginPasswordInput.focus(), 150);
-            } catch (err) {
-                console.error("Erreur inscription API, fallback local :", err);
-                const lowerEmail = email.trim().toLowerCase();
-                const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : 'zubiksservice@gmail.com';
-                const existing = state.members.find(m => (m.email || '').trim().toLowerCase() === lowerEmail);
-
-                if (existing || lowerEmail === targetAdminEmail) {
-                    showToast("Cette adresse email est déjà enregistrée.", "error");
-                    return;
+                let userCredential = null;
+                try {
+                    // Create user with Firebase Auth
+                    userCredential = await window.firebaseSignUp(window.firebaseAuth, email, password);
+                } catch (authErr) {
+                    // Si l'email existe déjà dans Firebase Auth (ex: utilisateur du cycle précédent), essayer de se connecter avec son mot de passe
+                    if (authErr.code === 'auth/email-already-in-use') {
+                        try {
+                            userCredential = await window.firebaseSignIn(window.firebaseAuth, email, password);
+                        } catch (loginErr) {
+                            throw new Error("Cet e-mail existe déjà dans le système. Si vous étiez inscrit au cycle précédent, veuillez utiliser votre mot de passe d'origine ou cliquer sur 'Mot de passe oublié'.");
+                        }
+                    } else {
+                        throw authErr;
+                    }
                 }
-
+                
+                // Register local data
                 const fullName = `${nom} ${postnom}`.trim();
                 const newUser = {
                     id: Date.now().toString(),
                     nom: fullName,
                     postnom: postnom,
                     sexe: sexe,
-                    email: lowerEmail,
-                    password: password,
+                    email: email,
                     role: 'user',
                     status: 'pending',
                     parts: 0,
@@ -479,20 +438,32 @@ document.addEventListener('DOMContentLoaded', () => {
                     dateAjout: new Date().toISOString(),
                     notifications: [{ id: Date.now().toString(), message: "Bienvenue sur ZUBIX SERVICE !", date: new Date().toISOString(), read: false }]
                 };
+                
                 if (state.deletedMembers) {
-                    state.deletedMembers = state.deletedMembers.filter(d => (d.email || '').trim().toLowerCase() !== lowerEmail);
+                    state.deletedMembers = state.deletedMembers.filter(d => (d.email || '').trim().toLowerCase() !== email);
                 }
-                state.members.push(newUser);
+                
+                // Éviter les doublons si le membre existe déjà dans state.members
+                const existingIndex = state.members.findIndex(m => (m.email || '').trim().toLowerCase() === email);
+                if (existingIndex !== -1) {
+                    state.members[existingIndex] = newUser;
+                } else {
+                    state.members.push(newUser);
+                }
+                
                 saveState();
                 renderAll();
                 registerForm.reset();
-                showToast("Création de compte réussie avec succès !", "success");
+                showToast("Inscription réussie ! Vous pouvez vous connecter.", "success");
                 if (btnShowLogin) btnShowLogin.click();
                 
                 const loginEmailInput = document.getElementById('email');
                 const loginPasswordInput = document.getElementById('password');
                 if (loginEmailInput) loginEmailInput.value = email;
                 if (loginPasswordInput) setTimeout(() => loginPasswordInput.focus(), 150);
+            } catch (err) {
+                console.error("Erreur d'inscription Firebase :", err);
+                showToast(err.message || "Erreur lors de l'inscription.", "error");
             }
         });
     }
@@ -504,22 +475,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const password = document.getElementById('password').value;
 
         try {
-            const res = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
+            if (!window.firebaseAuth) throw new Error("Firebase non initialisé");
+            
+            // Authenticate with Firebase
+            const userCredential = await window.firebaseSignIn(window.firebaseAuth, email, password);
+            const user = userCredential.user;
 
-            const data = await res.json();
-            if (!res.ok || !data.success) {
-                showToast(data.error || 'Email ou mot de passe incorrect.', 'error');
+            // Find user role and data in state
+            const lowerEmail = email.trim().toLowerCase();
+            const isDeletedLocal = (state.deletedMembers || []).some(d => (d.email || '').trim().toLowerCase() === lowerEmail);
+            if (isDeletedLocal) {
+                await window.firebaseSignOut(window.firebaseAuth);
+                showToast('Votre compte a été supprimé par l\'administrateur.', 'error');
                 return;
             }
 
-            currentJwtToken = data.token;
-            localStorage.setItem('zubiks_jwt_token', data.token);
+            const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : 'zubiksservice@gmail.com';
 
-            currentUser = data.user;
+            if (lowerEmail === targetAdminEmail) {
+                currentUser = { role: 'admin', nom: 'Admin ZUBIKS', email: targetAdminEmail };
+            } else {
+                const userMatch = state.members.find(m => (m.email || '').trim().toLowerCase() === lowerEmail);
+                if (userMatch) {
+                    currentUser = userMatch;
+                } else {
+                    await window.firebaseSignOut(window.firebaseAuth);
+                    showToast('Utilisateur non trouvé dans la base de données.', 'error');
+                    return;
+                }
+            }
+
             saveActiveSession(currentUser);
 
             await loadState();
@@ -531,7 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderAll();
             showToast(`Connexion réussie (${currentUser.role === 'admin' ? 'Administrateur' : currentUser.nom})`, 'success');
         } catch (err) {
-            console.error("Erreur de connexion serveur, fallback local :", err);
+            console.error("Erreur de connexion Firebase :", err);
 
             const lowerEmail = email.trim().toLowerCase();
 
@@ -594,19 +579,35 @@ document.addEventListener('DOMContentLoaded', () => {
         const securityPanelAdmin = document.getElementById('security-panel-admin');
         const backupPanelAdmin = document.getElementById('backup-panel-admin');
 
-        if (currentUser && currentUser.role === 'admin') {
+        if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'admin_second')) {
             if (adminNavGroup) adminNavGroup.style.display = 'flex';
             if (userNavGroup) userNavGroup.style.display = 'none';
             
             if (userRoleBadge) {
-                userRoleBadge.textContent = "Administrateur";
-                userRoleBadge.style.background = "var(--primary-color)";
+                userRoleBadge.textContent = currentUser.role === 'admin' ? "Administrateur" : "Admin (Secondaire)";
+                userRoleBadge.style.background = currentUser.role === 'admin' ? "var(--primary-color)" : "var(--warning-color, #dd6b20)";
             }
-            if (loggedUserName) loggedUserName.textContent = "Admin ZUBIKS";
+            if (loggedUserName) loggedUserName.textContent = currentUser.role === 'admin' ? "Admin ZUBIKS" : currentUser.nom;
             updateHeaderAvatar(currentUser);
 
-            if (securityPanelAdmin) securityPanelAdmin.style.display = 'block';
-            if (backupPanelAdmin) backupPanelAdmin.style.display = 'block';
+            const panelAdminSecondaire = document.getElementById('panel-admin-secondaire');
+            const panelResetApp = document.getElementById('panel-reset-app');
+
+            if (currentUser.role === 'admin_second') {
+                if (securityPanelAdmin) securityPanelAdmin.style.display = 'none';
+                if (backupPanelAdmin) backupPanelAdmin.style.display = 'none';
+                const archiveCycleBtn = document.getElementById('archive-cycle-btn');
+                if (archiveCycleBtn) archiveCycleBtn.style.display = 'none';
+                if (panelAdminSecondaire) panelAdminSecondaire.style.display = 'none';
+                if (panelResetApp) panelResetApp.style.display = 'none';
+            } else {
+                if (securityPanelAdmin) securityPanelAdmin.style.display = 'block';
+                if (backupPanelAdmin) backupPanelAdmin.style.display = 'block';
+                const archiveCycleBtn = document.getElementById('archive-cycle-btn');
+                if (archiveCycleBtn) archiveCycleBtn.style.display = 'inline-block';
+                if (panelAdminSecondaire) panelAdminSecondaire.style.display = 'block';
+                if (panelResetApp) panelResetApp.style.display = 'block';
+            }
 
             // Activer onglet accueil admin
             const adminHomeBtn = document.querySelector('[data-target="tab-accueil"]');
@@ -631,9 +632,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const performLogout = (msg = 'Vous êtes déconnecté.') => {
+    const performLogout = async (msg = 'Vous êtes déconnecté.') => {
+        try {
+            if (window.firebaseAuth) {
+                await window.firebaseSignOut(window.firebaseAuth);
+            }
+        } catch (error) {
+            console.error("Erreur lors de la déconnexion Firebase:", error);
+        }
+        
         currentUser = null;
-        currentJwtToken = null;
         localStorage.removeItem('zubiks_jwt_token');
         saveActiveSession(null);
 
@@ -867,8 +875,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Active members list
-        const activeMembers = state.members.filter(m => m.status !== 'pending');
+        // Active members list (excluding admins)
+        const activeMembers = state.members.filter(m => m.status !== 'pending' && m.role !== 'admin' && m.role !== 'admin_second');
 
         // Sort active members alphabetically
         const sortedMembers = [...activeMembers].sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
@@ -1438,6 +1446,55 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Broadcast Message Handler
+    const btnBroadcast = document.getElementById('btn-broadcast-message');
+    if (btnBroadcast) {
+        btnBroadcast.addEventListener('click', () => {
+            const annonce = prompt("Entrez le message ou l'annonce à envoyer à tous les utilisateurs :");
+            if (annonce && annonce.trim() !== '') {
+                if (confirm(`Êtes-vous sûr de vouloir envoyer cette annonce à tous vos membres ?`)) {
+                    const activeMembersList = state.members.filter(m => m.status !== 'pending' && m.role !== 'admin' && m.role !== 'admin_second');
+                    if (activeMembersList.length === 0) {
+                        showToast("Aucun membre actif à qui envoyer l'annonce.", "error");
+                        return;
+                    }
+                    if (!state.messages) state.messages = [];
+                    let count = 0;
+                    const timestamp = new Date().toISOString();
+                    const text = `📢 ANNONCE GÉNÉRALE: ${annonce.trim()}`;
+                    
+                    activeMembersList.forEach(member => {
+                        // Create chat message
+                        state.messages.push({
+                            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                            memberId: member.id,
+                            sender: 'admin',
+                            senderName: 'Administration',
+                            text: text,
+                            timestamp: timestamp,
+                            readByAdmin: true,
+                            readByUser: false
+                        });
+                        
+                        // Add notification
+                        if (!member.notifications) member.notifications = [];
+                        member.notifications.push({
+                            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                            message: `📢 Nouvelle annonce : "${annonce.length > 50 ? annonce.substring(0, 50) + '...' : annonce}"`,
+                            date: timestamp,
+                            read: false
+                        });
+                        count++;
+                    });
+                    
+                    saveState();
+                    showToast(`Annonce envoyée avec succès à ${count} membre(s) !`, "success");
+                    renderAll();
+                }
+            }
+        });
+    }
+
     // Auto-expand & Enter to send key handlers for chat textareas
     const setupTextareaAutoExpand = () => {
         const userChatInput = document.getElementById('user-chat-input');
@@ -1664,6 +1721,48 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('details-total-depots').textContent = depot.toLocaleString('fr-FR') + ' Fc';
             document.getElementById('details-total-retraits').textContent = retrait.toLocaleString('fr-FR') + ' Fc';
             document.getElementById('details-solde').textContent = solde.toLocaleString('fr-FR') + ' Fc';
+            
+            const promoteBtn = document.getElementById('promote-admin-btn');
+            if (promoteBtn) {
+                // Show button ONLY if current user is the MAIN admin
+                const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : 'zubiksservice@gmail.com';
+                if (currentUser && currentUser.role === 'admin' && (currentUser.email || '').toLowerCase() === targetAdminEmail) {
+                    promoteBtn.style.display = 'inline-block';
+                    
+                    if (member.role === 'admin_second') {
+                        promoteBtn.textContent = 'Retirer droits Admin';
+                        promoteBtn.style.backgroundColor = 'var(--danger-color, #e53e3e)';
+                        promoteBtn.onclick = () => {
+                            if (confirm(`Voulez-vous retirer les droits d'administrateur à ${member.nom} ?`)) {
+                                member.role = 'user';
+                                saveState();
+                                showToast(`${member.nom} n'est plus administrateur.`, 'success');
+                                memberDetailsModal.classList.remove('active');
+                                renderAll();
+                            }
+                        };
+                    } else {
+                        promoteBtn.textContent = 'Promouvoir Admin';
+                        promoteBtn.style.backgroundColor = 'var(--warning-color, #dd6b20)';
+                        promoteBtn.onclick = () => {
+                            const adminSecondCount = state.members.filter(m => m.role === 'admin_second').length;
+                            if (adminSecondCount >= 5) {
+                                showToast('Limite atteinte : Vous ne pouvez pas avoir plus de 5 administrateurs secondaires.', 'error');
+                                return;
+                            }
+                            if (confirm(`Voulez-vous promouvoir ${member.nom} comme Administrateur Secondaire ?\n\nIl aura accès au tableau de bord, mais sans les droits de sécurité.`)) {
+                                member.role = 'admin_second';
+                                saveState();
+                                showToast(`${member.nom} est maintenant administrateur secondaire !`, 'success');
+                                memberDetailsModal.classList.remove('active');
+                                renderAll();
+                            }
+                        };
+                    }
+                } else {
+                    promoteBtn.style.display = 'none';
+                }
+            }
             
             memberDetailsModal.classList.add('active');
         }
@@ -2029,6 +2128,51 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
+
+    // --- Admin & Sécurité Listeners ---
+    const createSecAdminForm = document.getElementById('create-secondary-admin-form');
+    if (createSecAdminForm) {
+        createSecAdminForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nom = document.getElementById('sec-admin-name').value.trim();
+            const email = document.getElementById('sec-admin-email').value.trim();
+            const password = document.getElementById('sec-admin-password').value;
+            
+            if (!nom || !email || !password) {
+                showToast("Veuillez remplir tous les champs.", "error");
+                return;
+            }
+            
+            try {
+                if (window.firebaseAuth && window.firebaseSignUp) {
+                    await window.firebaseSignUp(window.firebaseAuth, email, password);
+                }
+            } catch (err) {
+                console.error("Erreur Firebase Auth pour Admin Secondaire:", err);
+                if (err.code !== 'auth/email-already-in-use') {
+                    showToast("Erreur lors de la création du compte (Auth).", "error");
+                    return;
+                }
+            }
+            
+            const newAdmin = {
+                id: 'admin_' + Date.now(),
+                nom: nom,
+                email: email,
+                password: password,
+                role: 'admin_second',
+                status: 'active',
+                dateAjout: new Date().toISOString()
+            };
+            
+            state.members.push(newAdmin);
+            await saveState();
+            renderAll();
+            createSecAdminForm.reset();
+            showToast("Administrateur secondaire créé avec succès.", "success");
+        });
+    }
+
 
     // Initialize
     loadState().then(() => {

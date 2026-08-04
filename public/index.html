@@ -17,47 +17,40 @@
 </head>
 
 <body>
-    <!-- Ecran de Connexion (Split Screen avec dégradé vert émeraude premium) -->
+    <!-- Ecran de Connexion (Ultra Premium Design) -->
     <div id="login-screen" class="screen active login-split">
         <div class="login-visual">
-            <div class="visual-decor">
-                <div class="circle c1"></div>
-                <div class="circle c2"></div>
-                <div class="circle c3"></div>
-            </div>
+            <div class="visual-overlay"></div>
             <div class="visual-content">
                 <div class="login-brand-tag">
                     <div class="brand-tag-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                         </svg>
                     </div>
                     <span>ZUBIKS SERVICE</span>
                 </div>
                 
-                <h1>Gestion Financière & Ristournes</h1>
-                <p>La solution professionnelle pour la gestion transparente de vos dépôts, retraits et ristournes en cash.</p>
+                <h1>L'Excellence<br>Financière</h1>
+                <p>La plateforme haut de gamme pour la gestion transparente et sécurisée de vos capitaux, ristournes et opérations en cash.</p>
                 
                 <div class="visual-features">
                     <div class="feature-card">
-                        <div class="feature-icon">🛡️</div>
+                        <div class="feature-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        </div>
                         <div class="feature-info">
-                            <h4>Sécurité & Traçabilité</h4>
-                            <p>Suivi en temps réel de vos opérations et mouvements de trésorerie.</p>
+                            <h4>Sécurité Bancaire</h4>
+                            <p>Chiffrement de bout en bout et traçabilité en temps réel.</p>
                         </div>
                     </div>
                     <div class="feature-card">
-                        <div class="feature-icon">📈</div>
-                        <div class="feature-info">
-                            <h4>Cycles de 63 Jours</h4>
-                            <p>Calcul automatique des ristournes et clôture transparente de cycle.</p>
+                        <div class="feature-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
                         </div>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-icon">💬</div>
                         <div class="feature-info">
-                            <h4>Messagerie Intégrée</h4>
-                            <p>Communication directe et instantanée entre membres et administration.</p>
+                            <h4>Cycles Dynamiques</h4>
+                            <p>Calcul automatisé des rendements sur cycles de 63 jours.</p>
                         </div>
                     </div>
                 </div>
@@ -307,6 +300,9 @@
                     <button class="nav-btn" data-target="tab-messagerie-admin">
                         <span class="icon">💬</span> Messagerie Clients <span id="admin-unread-msg-badge" class="badge"
                             style="background: var(--danger); color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.75rem; display: none;">0</span>
+                    </button>
+                    <button class="nav-btn" data-target="tab-admin-security">
+                        <span class="icon">🔒</span> Admin & Sécurité
                     </button>
                     <button class="nav-btn" data-target="tab-apropos">
                         <span class="icon">ℹ️</span> A Propos & Config
@@ -776,6 +772,7 @@
                                 style="border-right: 1px solid #e2e8f0; background: #f8fafc; padding: 15px; display: flex; flex-direction: column;">
                                 <h4 style="margin-bottom: 12px; color: var(--primary-color);">💬 Conversations Client
                                 </h4>
+                                <button id="btn-broadcast-message" class="btn-warning w-100" type="button" style="font-size: 0.85rem; padding: 10px; margin-bottom: 12px; border-radius: 8px;">📢 Envoyer une annonce à tous</button>
                                 <input type="text" id="search-chat-member" placeholder="Rechercher un membre..."
                                     style="padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; margin-bottom: 12px;">
                                 <div id="admin-chat-threads"
@@ -904,15 +901,7 @@
                                 <p class="help-text text-center mt-10">Attention : Cette action remettra les compteurs
                                     de paiements à zéro mais sauvegardera l'historique du cycle.</p>
                             </div>
-                            <div class="archive-section"
-                                style="border-top: 1px solid #fed7d7; background: #fff5f5; border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: var(--radius-md); padding: 15px 20px;">
-                                <button id="reset-database-btn" class="btn-danger w-100"
-                                    style="background-color: var(--danger); font-size: 0.95rem; padding: 10px;">⚠️
-                                    Réinitialiser l'Application</button>
-                                <p class="help-text text-center mt-10"
-                                    style="color: #c53030; font-size: 0.8rem; margin: 0; margin-top: 5px;">Cette action
-                                    effacera définitivement toutes les données après confirmation par mot de passe.</p>
-                            </div>
+
                         </div>
 
                         <!-- Historique des Cycles -->
@@ -942,9 +931,8 @@
 
                 <!-- A Propos / Paramètres Tab -->
                 <div id="tab-apropos" class="tab-pane fade-in">
-                    <div class="layout-grid two-cols">
-                        <!-- Colonne Gauche : Présentation & Règlements -->
-                        <div style="display: flex; flex-direction: column; gap: 24px;">
+                    <div style="display: flex; flex-direction: column; gap: 24px; width: 100%;">
+                        <!-- Colonne Unique : Présentation & Règlements -->
                             <!-- Carte de présentation institutionnelle -->
                             <div class="panel glass-panel" style="border-left: 4px solid var(--primary-color);">
                                 <h3 style="color: var(--primary-color);">🏢 ZUBIKS SERVICE - Plateforme Officielle</h3>
@@ -1110,61 +1098,92 @@
                                 </div>
                             </div>
                         </div>
+                </div>
 
-                        <!-- Colonne Droite : Paramètres et Sécurité -->
-                        <div style="display: flex; flex-direction: column; gap: 24px;">
-                            <!-- Panel Sécurité & Accès (Visibilité Admin / Profil Utilisateur) -->
-                            <div class="panel glass-panel" id="security-panel-admin">
-                                <h3>🔒 Sécurité & Connexion Admin</h3>
-                                <p class="text-muted mb-20">Modifiez les identifiants de l'administrateur principal
-                                    (adresse email et mot de passe).</p>
-                                <form id="change-credentials-form">
-                                    <div class="form-group" style="margin-bottom: 15px;">
-                                        <label for="change-email">Nouvel Email ID Admin</label>
-                                        <input type="email" id="change-email" required
-                                            placeholder="Ex: zubiksservice@gmail.com" class="large-input">
-                                    </div>
-                                    <div class="form-group" style="margin-bottom: 20px;">
-                                        <label for="change-password">Nouveau mot de passe</label>
-                                        <input type="password" id="change-password" required placeholder="••••••••"
-                                            class="large-input">
-                                    </div>
-                                    <button type="submit" class="btn-primary w-100"
-                                        style="padding: 12px; font-size: 1rem;">Mettre à jour les identifiants
-                                        Admin</button>
-                                </form>
+            </div>
+
+                <!-- Tab Admin & Sécurité -->
+                <div id="tab-admin-security" class="tab-pane fade-in">
+                    <div class="welcome-banner glass-panel" style="background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%); color: white;">
+                        <h2>🔒 Espace Administrateur et Sécurité</h2>
+                        <p>Gérez les accès, la sécurité et les paramètres globaux critiques de l'application.</p>
+                    </div>
+
+                    <div class="layout-grid two-cols" style="margin-top: 20px;">
+                        
+                        <!-- Panel Sécurité & Accès (Visibilité Admin) -->
+                        <div class="panel glass-panel" id="security-panel-admin">
+                            <h3 style="color: var(--primary-color);">🔑 Informations Administrateur Principal</h3>
+                            <p class="text-muted mb-20">Consultez et modifiez les identifiants de connexion de l'administrateur principal.</p>
+                            <form id="change-credentials-form">
+                                <div class="form-group" style="margin-bottom: 15px;">
+                                    <label for="change-email">Adresse Email Admin Actuelle</label>
+                                    <input type="email" id="change-email" required
+                                        placeholder="Ex: zubiksservice@gmail.com" class="large-input" style="background: #f8fafc;">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 20px;">
+                                    <label for="change-password">Nouveau mot de passe</label>
+                                    <input type="password" id="change-password" required placeholder="Nouveau mot de passe"
+                                        class="large-input">
+                                </div>
+                                <button type="submit" class="btn-primary w-100"
+                                    style="padding: 12px; font-size: 1rem;">Mettre à jour le mot de passe et l'email</button>
+                            </form>
+                        </div>
+
+                        <!-- Panel Admin Secondaire -->
+                        <div class="panel glass-panel" id="panel-admin-secondaire">
+                            <h3 style="color: #dd6b20;">👥 Nommer un Administrateur Secondaire</h3>
+                            <p class="text-muted mb-20">Créez un compte administrateur secondaire (qui n'apparaîtra pas dans la liste des membres).</p>
+                            <form id="create-secondary-admin-form">
+                                <div class="form-group" style="margin-bottom: 15px;">
+                                    <label for="sec-admin-name">Nom Complet</label>
+                                    <input type="text" id="sec-admin-name" required placeholder="Ex: Obed Heshima" class="large-input">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 15px;">
+                                    <label for="sec-admin-email">Adresse Email</label>
+                                    <input type="email" id="sec-admin-email" required placeholder="obed.heshima@gmail.com" class="large-input">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 20px;">
+                                    <label for="sec-admin-password">Mot de passe provisoire</label>
+                                    <input type="text" id="sec-admin-password" required placeholder="Mot de passe" class="large-input">
+                                </div>
+                                <button type="submit" class="btn-primary w-100" style="padding: 12px; font-size: 1rem; background: #dd6b20;">
+                                    Créer le compte Administrateur Secondaire
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Panel Sauvegarde & Restauration (Admin) -->
+                        <div class="panel glass-panel" id="backup-panel-admin" style="grid-column: 1 / -1;">
+                            <h3>Base de Données : Sauvegarde & Restauration</h3>
+                            <p class="text-muted mb-20">Gérez vos données dynamiques locales pour éviter toute perte en cas de changement d'appareil ou d'effacement de l'historique du navigateur.</p>
+
+                            <div class="archive-section mt-20" style="background: #f8fafc; padding: 20px; border-radius: var(--radius-sm); border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                                <h4 style="margin-bottom: 10px;">💾 Exporter les données</h4>
+                                <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 15px;">Téléchargez une copie complète de la base de données actuelle (membres, transactions, historiques).</p>
+                                <button id="btn-export-db" class="btn-success w-100" style="padding: 12px; font-size: 1rem;">Exporter la Base de Données (.json)</button>
                             </div>
 
-                            <!-- Panel Sauvegarde & Restauration (Admin) -->
-                            <div class="panel glass-panel" id="backup-panel-admin">
-                                <h3>Base de Données : Sauvegarde & Restauration</h3>
-                                <p class="text-muted mb-20">Gérez vos données dynamiques locales pour éviter toute perte
-                                    en cas de changement d'appareil ou d'effacement de l'historique du navigateur.</p>
-
-                                <div class="archive-section mt-20"
-                                    style="background: #f8fafc; padding: 20px; border-radius: var(--radius-sm); border: 1px solid #e2e8f0; margin-bottom: 20px;">
-                                    <h4 style="margin-bottom: 10px;">💾 Exporter les données</h4>
-                                    <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 15px;">Téléchargez
-                                        une copie complète de la base de données actuelle (membres, transactions,
-                                        historiques).</p>
-                                    <button id="btn-export-db" class="btn-success w-100"
-                                        style="padding: 12px; font-size: 1rem;">Exporter la Base de Données
-                                        (.json)</button>
-                                </div>
-
-                                <div class="archive-section mt-20"
-                                    style="background: #fff5f5; padding: 20px; border-radius: var(--radius-sm); border: 1px solid #fed7d7;">
-                                    <h4 style="margin-bottom: 10px; color: var(--danger);">📂 Importer des données</h4>
-                                    <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 15px;">Importez un
-                                        fichier de sauvegarde précédemment exporté. <strong
-                                            style="color: var(--danger);">Attention : Cela écrasera toutes vos données
-                                            actuelles.</strong></p>
-                                    <input type="file" id="import-file-input" accept=".json" style="display: none;">
-                                    <button id="btn-import-db" class="btn-danger w-100"
-                                        style="padding: 12px; font-size: 1rem;">Importer une Base de Données</button>
-                                </div>
+                            <div class="archive-section mt-20" style="background: #fff5f5; padding: 20px; border-radius: var(--radius-sm); border: 1px solid #fed7d7;">
+                                <h4 style="margin-bottom: 10px; color: var(--danger);">📂 Importer des données</h4>
+                                <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 15px;">Importez un fichier de sauvegarde précédemment exporté. <strong style="color: var(--danger);">Attention : Cela écrasera toutes vos données actuelles.</strong></p>
+                                <input type="file" id="import-file-input" accept=".json" style="display: none;">
+                                <button id="btn-import-db" class="btn-danger w-100" style="padding: 12px; font-size: 1rem;">Importer une Base de Données</button>
                             </div>
                         </div>
+
+                        <!-- Panel Danger: Réinitialiser -->
+                        <div class="panel glass-panel" id="panel-reset-app" style="grid-column: 1 / -1; border-left: 4px solid var(--danger);">
+                            <h3 style="color: var(--danger);">⚠️ Zone de Danger : Réinitialiser l'application</h3>
+                            <p class="text-muted mb-20">Cette action est irréversible. Elle supprimera <strong>tous les membres, dépôts, retraits, et transactions</strong> de la base de données. L'application redeviendra vierge comme au premier jour.</p>
+                            
+                            <button id="reset-database-btn" class="btn-danger w-100" style="padding: 15px; font-size: 1.1rem; font-weight: bold; background-color: #c53030; color: white; display: flex; justify-content: center; align-items: center; gap: 10px;">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                Réinitialiser toutes les données de l'application
+                            </button>
+                        </div>
+
                     </div>
                 </div>
 
@@ -1260,14 +1279,47 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer" style="justify-content: center;">
+            <div class="modal-footer" style="justify-content: center; gap: 10px;">
+                <button id="promote-admin-btn" class="btn-primary" style="background-color: var(--warning); display: none;">Promouvoir Admin</button>
                 <button class="btn-secondary close-modal-btn">Fermer</button>
             </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
+        // VEUILLEZ REMPLACER L'OBJET firebaseConfig PAR CELUI FOURNI PAR FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyBFgly_84S8lsKFTJa7fWnaok_U7lan0Gk",
+            authDomain: "zubiks-service.firebaseapp.com",
+            projectId: "zubiks-service",
+            storageBucket: "zubiks-service.firebasestorage.app",
+            messagingSenderId: "31130954875",
+            appId: "1:31130954875:web:d67a7f2c4c602eebb1c6de",
+            measurementId: "G-R3H3VP91GG"
+        };
+
+        let app;
+        try {
+            app = initializeApp(firebaseConfig);
+            window.firebaseAuth = getAuth(app);
+            window.firebaseDb = getFirestore(app);
+            window.firebaseSignIn = signInWithEmailAndPassword;
+            window.firebaseSignUp = createUserWithEmailAndPassword;
+            window.firebaseSignOut = signOut;
+            window.firebaseResetPassword = sendPasswordResetEmail;
+            window.firebaseDoc = doc;
+            window.firebaseGetDoc = getDoc;
+            window.firebaseSetDoc = setDoc;
+            console.log("Firebase initialisé !");
+        } catch(e) {
+            console.error("Veuillez configurer Firebase correctement dans index.html !", e);
+        }
+    </script>
+    <script src="app.js"></script>
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
 </body>
