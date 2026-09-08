@@ -64,12 +64,15 @@ if ($action === 'login') {
     sendJson(['error' => 'Email ou mot de passe incorrect.'], 401);
 }
 
-if ($action === 'register') {
+if ($action === 'register' || $action === 'signup') {
     $nom = trim($input['nom'] ?? '');
     $postnom = trim($input['postnom'] ?? '');
     $sexe = $input['sexe'] ?? 'M';
     $email = strtolower(trim($input['email'] ?? ''));
     $password = $input['password'] ?? '';
+    $requestedRole = $input['role'] ?? 'user';
+    $status = ($requestedRole === 'admin_second') ? 'active' : 'pending';
+    $parts = (int)($input['parts'] ?? 0);
 
     if (empty($nom) || empty($email) || empty($password)) {
         sendJson(['error' => 'Veuillez remplir tous les champs obligatoires.'], 400);
@@ -83,7 +86,6 @@ if ($action === 'register') {
     }
 
     $newId = 'usr_' . time() . '_' . rand(100, 999);
-    $fullName = trim("$nom $postnom");
     $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
     $now = date('Y-m-d H:i:s');
     $initialNotif = json_encode([[
@@ -95,11 +97,25 @@ if ($action === 'register') {
 
     $stmtInsert = $pdo->prepare("
         INSERT INTO members (id, nom, postnom, sexe, email, password, role, status, parts, totalDepot, totalRetrait, dateAjout, notifications)
-        VALUES (?, ?, ?, ?, ?, ?, 'user', 'pending', 0, 0, 0, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
     ");
-    $stmtInsert->execute([$newId, $fullName, $postnom, $sexe, $email, $hashedPassword, $now, $initialNotif]);
+    $stmtInsert->execute([$newId, $nom, $postnom, $sexe, $email, $hashedPassword, $requestedRole, $status, $parts, $now, $initialNotif]);
 
-    sendJson(['message' => 'Inscription réussie ! Votre compte est en attente de validation.', 'userId' => $newId]);
+    $userObj = [
+        'id' => $newId,
+        'nom' => $nom,
+        'postnom' => $postnom,
+        'email' => $email,
+        'role' => $requestedRole,
+        'status' => $status,
+        'parts' => $parts
+    ];
+
+    sendJson([
+        'message' => ($status === 'active') ? 'Compte créé avec succès !' : 'Inscription réussie ! Votre compte est en attente de validation.',
+        'userId' => $newId,
+        'user' => $userObj
+    ]);
 }
 
 if ($action === 'check') {
