@@ -1,4 +1,25 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // --- Theme Toggle Logic ---
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    if (themeToggleBtn) {
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        if (currentTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+            themeToggleBtn.textContent = '☀️';
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) {
+                localStorage.setItem('theme', 'dark');
+                themeToggleBtn.textContent = '☀️';
+            } else {
+                localStorage.setItem('theme', 'light');
+                themeToggleBtn.textContent = '🌙';
+            }
+        });
+    }
+
     // --- Anti-DevTools & Anti-Right-Click Protection ---
     document.addEventListener('contextmenu', (e) => e.preventDefault());
     document.addEventListener('keydown', (e) => {
@@ -85,141 +106,88 @@ document.addEventListener('DOMContentLoaded', () => {
         deletedMembers: [], // [{ id, email, nom, deletedAt }]
         messages: [], // [{ id, memberId, sender, senderName, text, timestamp, readByAdmin, readByUser }]
         credentials: {
-            email: 'zubiksservice@gmail.com',
-            password: 'Zubiks@2000'
+            email: 'zubiksservice@gmail.com'
         }
     };
 
-    // Load State
+    // API Endpoints PHP & MySQL
+    const API = {
+        auth: '../api/auth.php',
+        members: '../api/members.php',
+        transactions: '../api/transactions.php',
+        stats: '../api/stats.php',
+        messages: '../api/messages.php'
+    };
+
+    // Load State from PHP / MySQL Backend
     const loadState = async () => {
-        // Fallback local storage parsing
-        const loadFromLocal = () => {
-            const savedState = localStorage.getItem('zubiksStateV2') || localStorage.getItem('zubixStateV2');
-            if (savedState) {
-                try {
-                    const parsed = JSON.parse(savedState);
-                    // Migration
-                    state = {
-                        ...state,
-                        ...parsed,
-                        dailyDepots: parsed.dailyDepots !== undefined ? parsed.dailyDepots : (parsed.dailyTotal || 0),
-                        cycleDepots: parsed.cycleDepots !== undefined ? parsed.cycleDepots : (parsed.cycleTotal || 0),
-                        dailyRetraits: parsed.dailyRetraits || 0,
-                        cycleRetraits: parsed.cycleRetraits || 0,
-                    };
-                    state.members = (parsed.members || []).map(m => ({
-                        ...m,
-                        totalDepot: m.totalDepot !== undefined ? m.totalDepot : (m.totalPaye || 0),
-                        totalRetrait: m.totalRetrait || 0
-                    }));
-                    state.archives = parsed.archives || [];
-                    state.dailyArchives = parsed.dailyArchives || [];
-                    state.transactions = parsed.transactions || [];
-                    state.deletedMembers = parsed.deletedMembers || [];
-                    state.messages = parsed.messages || [];
-                    state.argentDebut = parsed.argentDebut !== undefined ? parsed.argentDebut : 0;
-                    state.credentials = parsed.credentials || {
-                        email: 'zubiksservice@gmail.com',
-                        password: 'Zubiks@2000'
-                    };
-
-                    // Auto-migrate stale admin email
-                    if (state.credentials && state.credentials.email && state.credentials.email.toLowerCase() === 'obedtechn02@gmail.com') {
-                        state.credentials.email = 'zubiksservice@gmail.com';
-                    }
-
-                    // Populate change credentials email
-                    const changeEmailInput = document.getElementById('change-email');
-                    if (changeEmailInput && state.credentials && state.credentials.email) {
-                        changeEmailInput.value = state.credentials.email;
-                    }
-                } catch (error) {
-                    console.error("Erreur lors du chargement des données locales :", error);
-                }
-            }
-        };
-
         try {
-            if (window.firebaseDb && window.firebaseGetDoc && window.firebaseDoc) {
-                const docRef = window.firebaseDoc(window.firebaseDb, "zubiks", "state");
-                const docSnap = await window.firebaseGetDoc(docRef);
-                
-                if (docSnap.exists()) {
-                    const parsed = docSnap.data();
-                    
-                    state = {
-                        ...state,
-                        ...parsed,
-                    };
-                    state.members = (parsed.members || []).map(m => ({
-                        ...m,
-                        totalDepot: m.totalDepot !== undefined ? m.totalDepot : 0,
-                        totalRetrait: m.totalRetrait || 0
-                    }));
-                    state.archives = parsed.archives || [];
-                    state.dailyArchives = parsed.dailyArchives || [];
-                    state.transactions = parsed.transactions || [];
-                    state.deletedMembers = parsed.deletedMembers || [];
-                    state.messages = parsed.messages || [];
-                    state.argentDebut = parsed.argentDebut !== undefined ? parsed.argentDebut : 0;
-                    state.credentials = parsed.credentials || {
-                        email: 'zubiksservice@gmail.com'
-                    };
+            // 1. Fetch Global Stats & Regulations & Archives
+            const statsRes = await fetch(`${API.stats}`);
+            if (statsRes.ok) {
+                const data = await statsRes.json();
+                if (data.stats) {
+                    state.dailyDepots = parseFloat(data.stats.dailyDepots) || 0;
+                    state.dailyRetraits = parseFloat(data.stats.dailyRetraits) || 0;
+                    state.cycleDepots = parseFloat(data.stats.cycleDepots) || 0;
+                    state.cycleRetraits = parseFloat(data.stats.cycleRetraits) || 0;
+                    state.argentDebut = parseFloat(data.stats.argentDebut) || 0;
+                    state.reglements = data.stats.reglements || "";
+                    state.credentials = { email: data.stats.admin_email || 'zubiksservice@gmail.com' };
 
-                    console.log("Données chargées depuis Firestore.");
-                    // Render rules in rules textarea if present
                     const textarea = document.querySelector('.modern-textarea');
-                    if (textarea) textarea.value = state.reglements || "";
+                    if (textarea && document.activeElement !== textarea) textarea.value = state.reglements;
 
-                    // Populate change credentials email
                     const changeEmailInput = document.getElementById('change-email');
-                    if (changeEmailInput && state.credentials && state.credentials.email) {
+                    if (changeEmailInput && state.credentials.email) {
                         changeEmailInput.value = state.credentials.email;
                     }
-                    
-                    renderAll();
-                } else {
-                    console.log("Aucune donnée trouvée sur Firestore, initialisation depuis le stockage local.");
-                    loadFromLocal();
-                    saveState(); // Initialize Firestore with local data
-                    renderAll();
                 }
-            } else {
-                throw new Error("Firebase non initialisé");
+                state.archives = data.archives || [];
+                state.dailyArchives = data.dailyArchives || [];
             }
-        } catch (err) {
-            console.warn("Impossible de joindre Firestore (utilisation du stockage local) :", err);
-            loadFromLocal();
+
+            // 2. Fetch Members
+            const membersRes = await fetch(`${API.members}`);
+            if (membersRes.ok) {
+                const membersData = await membersRes.json();
+                state.members = Array.isArray(membersData) ? membersData : [];
+            }
+
+            // 3. Fetch Transactions
+            const txRes = await fetch(`${API.transactions}`);
+            if (txRes.ok) {
+                const txData = await txRes.json();
+                state.transactions = Array.isArray(txData) ? txData : [];
+            }
+
+            // 4. Fetch Messages
+            const msgRes = await fetch(`${API.messages}`);
+            if (msgRes.ok) {
+                const msgData = await msgRes.json();
+                state.messages = Array.isArray(msgData) ? msgData : [];
+            }
+
             renderAll();
+        } catch (err) {
+            console.error("Erreur de chargement API Backend :", err);
         }
     };
 
-    // Save State
-    const saveState = async () => {
-        // Save to local storage first (instant client feedback / fallback)
-        localStorage.setItem('zubiksStateV2', JSON.stringify(state));
-
-        try {
-            if (window.firebaseDb && window.firebaseSetDoc && window.firebaseDoc) {
-                const docRef = window.firebaseDoc(window.firebaseDb, "zubiks", "state");
-                // Remove password from state before saving to Firestore for security
-                const stateToSave = JSON.parse(JSON.stringify(state));
-                if (stateToSave.credentials) {
-                    delete stateToSave.credentials.password;
-                    delete stateToSave.credentials.passwordHash;
-                }
-                if (stateToSave.members) {
-                    stateToSave.members.forEach(m => {
-                        delete m.password;
-                        delete m.passwordHash;
-                    });
-                }
-                await window.firebaseSetDoc(docRef, stateToSave);
-                console.log("Données sauvegardées sur Firestore.");
-            }
-        } catch (err) {
-            console.error("Erreur de sauvegarde sur Firestore (données conservées localement) :", err);
+    // Setup Auto Refresh / Polling
+    let syncInterval = null;
+    const setupListeners = () => {
+        if (!syncInterval) {
+            syncInterval = setInterval(() => {
+                loadState();
+            }, 5000);
         }
+    };
+
+    // Save State is replaced by atomic operations in collections.
+    const saveState = async () => {
+        // Stub for backward compatibility during refactoring
+        console.warn("saveState() a été appelé mais est obsolète. Utilisez les opérations Firestore spécifiques.");
     };
 
     // --- Date Initialization ---
@@ -403,66 +371,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                if (!window.firebaseAuth) throw new Error("Firebase non initialisé");
-                
-                let userCredential = null;
-                try {
-                    // Create user with Firebase Auth
-                    userCredential = await window.firebaseSignUp(window.firebaseAuth, email, password);
-                } catch (authErr) {
-                    // Si l'email existe déjà dans Firebase Auth (ex: utilisateur du cycle précédent), essayer de se connecter avec son mot de passe
-                    if (authErr.code === 'auth/email-already-in-use') {
-                        try {
-                            userCredential = await window.firebaseSignIn(window.firebaseAuth, email, password);
-                        } catch (loginErr) {
-                            throw new Error("Cet e-mail existe déjà dans le système. Si vous étiez inscrit au cycle précédent, veuillez utiliser votre mot de passe d'origine ou cliquer sur 'Mot de passe oublié'.");
-                        }
-                    } else {
-                        throw authErr;
-                    }
-                }
-                
-                // Register local data
-                const fullName = `${nom} ${postnom}`.trim();
-                const newUser = {
-                    id: Date.now().toString(),
-                    nom: fullName,
-                    postnom: postnom,
-                    sexe: sexe,
-                    email: email,
-                    role: 'user',
-                    status: 'pending',
-                    parts: 0,
-                    totalDepot: 0,
-                    totalRetrait: 0,
-                    dateAjout: new Date().toISOString(),
-                    notifications: [{ id: Date.now().toString(), message: "Bienvenue sur ZUBIX SERVICE !", date: new Date().toISOString(), read: false }]
-                };
-                
-                if (state.deletedMembers) {
-                    state.deletedMembers = state.deletedMembers.filter(d => (d.email || '').trim().toLowerCase() !== email);
-                }
-                
-                // Éviter les doublons si le membre existe déjà dans state.members
-                const existingIndex = state.members.findIndex(m => (m.email || '').trim().toLowerCase() === email);
-                if (existingIndex !== -1) {
-                    state.members[existingIndex] = newUser;
-                } else {
-                    state.members.push(newUser);
-                }
-                
-                saveState();
-                renderAll();
+                const res = await fetch(`${API.auth}?action=register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nom, postnom, sexe, email, password })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Erreur lors de l'inscription.");
+
+                await loadState();
                 registerForm.reset();
                 showToast("Inscription réussie ! Vous pouvez vous connecter.", "success");
                 if (btnShowLogin) btnShowLogin.click();
-                
+
                 const loginEmailInput = document.getElementById('email');
                 const loginPasswordInput = document.getElementById('password');
                 if (loginEmailInput) loginEmailInput.value = email;
                 if (loginPasswordInput) setTimeout(() => loginPasswordInput.focus(), 150);
             } catch (err) {
-                console.error("Erreur d'inscription Firebase :", err);
+                console.error("Erreur d'inscription Backend :", err);
                 showToast(err.message || "Erreur lors de l'inscription.", "error");
             }
         });
@@ -474,41 +401,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const email = document.getElementById('email').value.trim().toLowerCase();
         const password = document.getElementById('password').value;
 
+        if (!email || !password) {
+            showToast('Veuillez remplir tous les champs.', 'error');
+            return;
+        }
+
         try {
-            if (!window.firebaseAuth) throw new Error("Firebase non initialisé");
-            
-            // Authenticate with Firebase
-            const userCredential = await window.firebaseSignIn(window.firebaseAuth, email, password);
-            const user = userCredential.user;
+            const res = await fetch(`${API.auth}?action=login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Erreur de connexion.");
 
-            // Find user role and data in state
-            const lowerEmail = email.trim().toLowerCase();
-            const isDeletedLocal = (state.deletedMembers || []).some(d => (d.email || '').trim().toLowerCase() === lowerEmail);
-            if (isDeletedLocal) {
-                await window.firebaseSignOut(window.firebaseAuth);
-                showToast('Votre compte a été supprimé par l\'administrateur.', 'error');
-                return;
-            }
-
-            const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : 'zubiksservice@gmail.com';
-
-            if (lowerEmail === targetAdminEmail) {
-                currentUser = { role: 'admin', nom: 'Admin ZUBIKS', email: targetAdminEmail };
-            } else {
-                const userMatch = state.members.find(m => (m.email || '').trim().toLowerCase() === lowerEmail);
-                if (userMatch) {
-                    currentUser = userMatch;
-                } else {
-                    await window.firebaseSignOut(window.firebaseAuth);
-                    showToast('Utilisateur non trouvé dans la base de données.', 'error');
-                    return;
-                }
-            }
-
+            currentUser = data.user;
             saveActiveSession(currentUser);
 
             await loadState();
-
             switchRoleView();
             loginScreen.classList.remove('active');
             dashboardScreen.classList.add('active');
@@ -516,59 +426,73 @@ document.addEventListener('DOMContentLoaded', () => {
             renderAll();
             showToast(`Connexion réussie (${currentUser.role === 'admin' ? 'Administrateur' : currentUser.nom})`, 'success');
         } catch (err) {
-            console.error("Erreur de connexion Firebase :", err);
-
-            const lowerEmail = email.trim().toLowerCase();
-
-            // Check if email belongs to a deleted account
-            const isDeletedLocal = (state.deletedMembers || []).some(d => (d.email || '').trim().toLowerCase() === lowerEmail);
-            if (isDeletedLocal) {
-                showToast('Votre compte a été supprimé par l\'administrateur.', 'error');
-                return;
-            }
-
-            const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : 'zubiksservice@gmail.com';
-            const targetAdminPassword = (state.credentials && state.credentials.password) ? state.credentials.password : 'Zubiks@2000';
-
-            if (lowerEmail === targetAdminEmail) {
-                if (password === targetAdminPassword) {
-                    currentUser = { role: 'admin', nom: 'Admin ZUBIKS', email: targetAdminEmail };
-                    saveActiveSession(currentUser);
-                    switchRoleView();
-                    loginScreen.classList.remove('active');
-                    dashboardScreen.classList.add('active');
-                    updateDates();
-                    renderAll();
-                    showToast('Connexion Administrateur réussie', 'success');
-                } else {
-                    showToast('Email ou mot de passe incorrect.', 'error');
-                }
-                return;
-            }
-
-            const userMatch = state.members.find(m => (m.email || '').trim().toLowerCase() === lowerEmail && m.password === password);
-            if (userMatch) {
-                currentUser = userMatch;
-                saveActiveSession(currentUser);
-                switchRoleView();
-                loginScreen.classList.remove('active');
-                dashboardScreen.classList.add('active');
-                updateDates();
-                renderAll();
-                showToast(`Bienvenue, ${userMatch.nom}`, 'success');
-                return;
-            }
-
-            showToast('Email ou mot de passe incorrect.', 'error');
+            console.error("Erreur de connexion Backend :", err);
+            showToast(err.message || 'Email ou mot de passe incorrect.', 'error');
         }
     });
 
     const updateHeaderAvatar = (user) => {
         const loggedUserAvatar = document.getElementById('logged-user-avatar');
         if (!loggedUserAvatar) return;
-        const initials = (user && user.nom ? user.nom : 'Admin').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-        loggedUserAvatar.textContent = initials;
+        
+        if (user && user.profilePhoto) {
+            loggedUserAvatar.innerHTML = `<img src="${user.profilePhoto}" style="width: 100%; height: 100%; object-fit: cover;" alt="Profil">`;
+        } else {
+            const initials = (user && user.nom ? user.nom : 'Admin').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            loggedUserAvatar.textContent = initials;
+        }
     };
+
+    const profilePhotoInput = document.getElementById('profile-photo-input');
+    const loggedUserAvatarElement = document.getElementById('logged-user-avatar');
+
+    if (loggedUserAvatarElement && profilePhotoInput) {
+        loggedUserAvatarElement.addEventListener('click', () => {
+            if (currentUser) {
+                profilePhotoInput.click();
+            }
+        });
+
+        profilePhotoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.size > 2 * 1024 * 1024) {
+                if (typeof showToast === 'function') showToast("L'image est trop grande (max 2 Mo).", "error");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                const base64String = event.target.result;
+                if (currentUser) {
+                    try {
+                        if (currentUser.role === 'admin' || currentUser.role === 'admin_second') {
+                            const newCredentials = { ...state.credentials, profilePhoto: base64String };
+                            await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "global", "stats"), {
+                                credentials: newCredentials
+                            });
+                            state.credentials = newCredentials;
+                            currentUser.profilePhoto = base64String;
+                        } else {
+                            await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(currentUser.id)), {
+                                profilePhoto: base64String
+                            });
+                            const userIndex = state.members.findIndex(m => String(m.id) === String(currentUser.id));
+                            if (userIndex !== -1) state.members[userIndex].profilePhoto = base64String;
+                            currentUser.profilePhoto = base64String;
+                        }
+                        updateHeaderAvatar(currentUser);
+                        if (typeof showToast === 'function') showToast("Photo de profil mise à jour !", "success");
+                    } catch (error) {
+                        console.error("Erreur mise à jour photo:", error);
+                        if (typeof showToast === 'function') showToast("Erreur lors de la mise à jour de la photo.", "error");
+                    }
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+    }
 
     const switchRoleView = () => {
         const adminNavGroup = document.getElementById('admin-nav-group');
@@ -582,7 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'admin_second')) {
             if (adminNavGroup) adminNavGroup.style.display = 'flex';
             if (userNavGroup) userNavGroup.style.display = 'none';
-            
+
             if (userRoleBadge) {
                 userRoleBadge.textContent = currentUser.role === 'admin' ? "Administrateur" : "Admin (Secondaire)";
                 userRoleBadge.style.background = currentUser.role === 'admin' ? "var(--primary-color)" : "var(--warning-color, #dd6b20)";
@@ -640,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Erreur lors de la déconnexion Firebase:", error);
         }
-        
+
         currentUser = null;
         localStorage.removeItem('zubiks_jwt_token');
         saveActiveSession(null);
@@ -719,7 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     navBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
             const allNavBtns = document.querySelectorAll('.nav-btn');
             const allTabPanes = document.querySelectorAll('.tab-pane');
 
@@ -744,10 +668,66 @@ document.addEventListener('DOMContentLoaded', () => {
                 pageTitle.textContent = tabTitles[targetId];
             }
 
+            // Marquer comme lu si l'utilisateur normal ouvre la messagerie ou les notifications
+            if (currentUser && currentUser.role !== 'admin') {
+                if (targetId === 'tab-messagerie-user' && state.messages) {
+                    let updatedMsgs = false;
+                    state.messages.forEach(async m => {
+                        if (String(m.memberId) === String(currentUser.id) && !m.readByUser && m.sender === 'admin') {
+                            m.readByUser = true;
+                            updatedMsgs = true;
+                            try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "messages", String(m.id)), { readByUser: true }); } catch (e) { }
+                        }
+                    });
+                    if (updatedMsgs) renderAll();
+                } else if (targetId === 'tab-user-notifications' && currentUser.notifications) {
+                    let updatedNotifs = false;
+                    const newNotifs = currentUser.notifications.map(n => {
+                        if (!n.read) {
+                            updatedNotifs = true;
+                            return { ...n, read: true };
+                        }
+                        return n;
+                    });
+                    if (updatedNotifs) {
+                        currentUser.notifications = newNotifs;
+                        renderAll();
+                        try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(currentUser.id)), { notifications: newNotifs }); } catch (e) { }
+                    }
+                }
+            }
+
             // Fermer le tiroir mobile après sélection
             closeSidebarMobile();
         });
     });
+
+    // Add header buttons logic
+    const topChatBtn = document.getElementById('top-chat-btn');
+    if (topChatBtn) {
+        topChatBtn.addEventListener('click', () => {
+            if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'admin_second')) {
+                const adminMsgBtn = document.querySelector('.nav-btn[data-target="tab-messagerie-admin"]');
+                if (adminMsgBtn) adminMsgBtn.click();
+            } else {
+                const userMsgBtn = document.querySelector('.nav-btn[data-target="tab-messagerie-user"]');
+                if (userMsgBtn) userMsgBtn.click();
+            }
+        });
+    }
+
+    const topNotifBtn = document.getElementById('top-notif-btn');
+    if (topNotifBtn) {
+        topNotifBtn.addEventListener('click', () => {
+            if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'admin_second')) {
+                const membresBtn = document.querySelector('.nav-btn[data-target="tab-membres"]');
+                if (membresBtn) membresBtn.click();
+            } else {
+                const userNotifBtn = document.querySelector('.nav-btn[data-target="tab-user-notifications"]');
+                if (userNotifBtn) userNotifBtn.click();
+            }
+        });
+    }
 
     // Add search event listeners
     if (searchMemberInput) searchMemberInput.addEventListener('input', () => renderAll());
@@ -756,13 +736,113 @@ document.addEventListener('DOMContentLoaded', () => {
     if (searchTransactionInput) searchTransactionInput.addEventListener('input', () => renderAll());
     if (filterTransactionDate) filterTransactionDate.addEventListener('change', () => renderAll());
 
+    // Export PDF Logic
+    const exportPdfBtn = document.getElementById('export-transactions-pdf');
+    if (exportPdfBtn) {
+        exportPdfBtn.addEventListener('click', () => {
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                showToast("Erreur: Bibliothèque PDF non chargée.", "error");
+                return;
+            }
+
+            const transactionSearchTerm = searchTransactionInput ? searchTransactionInput.value.toLowerCase() : '';
+            const transactionFilterDate = filterTransactionDate ? filterTransactionDate.value : '';
+
+            // Filter transactions (same logic as renderAll)
+            const filteredTransactions = (state.transactions || []).filter(t => {
+                const matchesSearch = !transactionSearchTerm ||
+                    (t.memberNom || '').toLowerCase().includes(transactionSearchTerm) ||
+                    (t.type || '').toLowerCase().includes(transactionSearchTerm);
+                const matchesDate = !transactionFilterDate || t.date === transactionFilterDate;
+                return matchesSearch && matchesDate;
+            });
+
+            if (filteredTransactions.length === 0) {
+                showToast("Aucune transaction à exporter.", "warning");
+                return;
+            }
+
+            const doc = new window.jspdf.jsPDF();
+
+            // Header
+            doc.setFontSize(18);
+            doc.setTextColor(44, 62, 80);
+            doc.text('Historique des Transactions', 14, 22);
+
+            doc.setFontSize(11);
+            doc.setTextColor(100);
+            doc.text(`Date d'export : ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, 14, 30);
+
+            if (transactionSearchTerm || transactionFilterDate) {
+                doc.text(`Filtres appliqués : ${transactionSearchTerm} ${transactionFilterDate}`, 14, 36);
+            }
+
+            // Table Data
+            const tableColumn = ["Date", "Nom du Membre", "Type", "Montant (Fc)", "Validé par"];
+            const tableRows = [];
+
+            let totalDepots = 0;
+            let totalRetraits = 0;
+
+            filteredTransactions.forEach(t => {
+                const dateStr = new Date(t.date || t.timestamp).toLocaleDateString('fr-FR');
+                const type = t.type === 'depot' ? 'Dépôt' : 'Retrait';
+                const amount = (t.amount || 0);
+
+                if (t.type === 'depot') totalDepots += amount;
+                else totalRetraits += amount;
+
+                tableRows.push([
+                    dateStr,
+                    t.memberNom || 'N/A',
+                    type,
+                    amount.toLocaleString('fr-FR').replace(/\s|\u202F|\u00A0/g, ' '),
+                    t.adminNom || 'Admin'
+                ]);
+            });
+
+            // Add Table
+            doc.autoTable({
+                head: [tableColumn],
+                body: tableRows,
+                startY: transactionSearchTerm || transactionFilterDate ? 42 : 36,
+                theme: 'striped',
+                headStyles: { fillColor: [44, 62, 80] },
+                didParseCell: function (data) {
+                    if (data.section === 'body' && data.column.index === 2) {
+                        data.cell.styles.textColor = data.cell.raw === 'Dépôt' ? [46, 125, 50] : [198, 40, 40];
+                        data.cell.styles.fontStyle = 'bold';
+                    }
+                    if (data.section === 'body' && data.column.index === 3) {
+                        data.cell.styles.fontStyle = 'bold';
+                    }
+                }
+            });
+
+            // Summary
+            const finalY = doc.lastAutoTable.finalY + 10;
+            doc.setFontSize(12);
+            doc.setTextColor(44, 62, 80);
+            doc.text('Résumé :', 14, finalY);
+            doc.setFontSize(11);
+            doc.setTextColor(46, 125, 50); // Green
+            doc.text(`Total Dépôts : ${totalDepots.toLocaleString('fr-FR').replace(/\s|\u202F|\u00A0/g, ' ')} Fc`, 14, finalY + 7);
+            doc.setTextColor(198, 40, 40); // Red
+            doc.text(`Total Retraits : ${totalRetraits.toLocaleString('fr-FR').replace(/\s|\u202F|\u00A0/g, ' ')} Fc`, 14, finalY + 14);
+
+            // Save PDF
+            doc.save('historique_transactions.pdf');
+            showToast("PDF généré avec succès !", "success");
+        });
+    }
+
     // --- Members Logic ---
     const formatDate = (dateString) => {
         const d = new Date(dateString);
         return d.toLocaleDateString('fr-FR');
     };
 
-    addMemberForm.addEventListener('submit', (e) => {
+    addMemberForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const nom = nomIdInput.value.trim();
         const parts = parseInt(partsInput.value);
@@ -775,26 +855,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            const newId = Date.now().toString();
             const newMember = {
-                id: Date.now().toString(),
+                id: newId,
                 nom: nom,
                 parts: parts,
+                role: 'user',
+                status: 'active',
                 totalDepot: 0,
                 totalRetrait: 0,
-                dateAjout: new Date().toISOString()
+                dateAjout: new Date().toISOString(),
+                notifications: []
             };
-            state.members.push(newMember);
-            saveState();
-            renderAll();
-            addMemberForm.reset();
-            showToast('Nouveau membre ajouté avec succès.', 'success');
+
+            try {
+                const res = await fetch(`${API.members}?action=add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nom, parts })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Erreur lors de l'ajout.");
+
+                await loadState();
+                addMemberForm.reset();
+                showToast('Nouveau membre ajouté avec succès.', 'success');
+            } catch (error) {
+                console.error("Erreur lors de l'ajout du membre:", error);
+                showToast(error.message || 'Erreur lors de l\'ajout du membre.', 'error');
+            }
         }
     });
 
-
-
     // --- Rendering Logic ---
-    window.validateMemberParts = (id) => {
+    window.validateMemberParts = async (id) => {
         const input = document.getElementById(`pending-parts-${id}`);
         if (!input) return;
 
@@ -806,20 +900,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const member = state.members.find(m => String(m.id) === String(id));
         if (member) {
-            member.parts = parts;
-            member.status = 'active';
+            try {
+                const res = await fetch(`${API.members}?action=validate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, parts })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Erreur de validation.");
 
-            if (!member.notifications) member.notifications = [];
-            member.notifications.push({
-                id: Date.now().toString(),
-                message: `🎉 Votre compte a été validé par l'administrateur avec ${parts} part(s) attribuée(s). Vous pouvez désormais effectuer vos opérations cash !`,
-                date: new Date().toISOString(),
-                read: false
-            });
-
-            saveState();
-            renderAll();
-            showToast(`Compte de "${member.nom}" validé avec ${parts} part(s).`, "success");
+                await loadState();
+                showToast(`Compte de "${member.nom}" validé avec ${parts} part(s).`, "success");
+            } catch (error) {
+                console.error("Erreur de validation:", error);
+                showToast(error.message || 'Erreur lors de la validation du membre.', 'error');
+            }
         }
     };
 
@@ -829,6 +924,46 @@ document.addEventListener('DOMContentLoaded', () => {
         const retraitSearchTerm = (searchRetraitInput ? searchRetraitInput.value.toLowerCase() : '');
         const transactionSearchTerm = (searchTransactionInput ? searchTransactionInput.value.toLowerCase() : '');
         const transactionFilterDate = (filterTransactionDate ? filterTransactionDate.value : '');
+
+        // Badge logic for top icons
+        const topChatBadge = document.getElementById('top-chat-badge');
+        const topNotifBadge = document.getElementById('top-notif-badge');
+
+        if (currentUser) {
+            let unreadMessages = 0;
+            let unreadNotifs = 0;
+
+            if (currentUser.role === 'admin') {
+                unreadMessages = (state.messages || []).filter(m => !m.readByAdmin).length;
+                unreadNotifs = (state.members || []).filter(m => m.status === 'pending').length;
+            } else {
+                unreadMessages = (state.messages || []).filter(m => String(m.memberId) === String(currentUser.id) && !m.readByUser).length;
+                unreadNotifs = (currentUser.notifications || []).filter(n => !n.read).length;
+            }
+
+            if (topChatBadge) {
+                if (unreadMessages > 0) {
+                    topChatBadge.style.display = 'flex';
+                    topChatBadge.textContent = unreadMessages > 9 ? '9+' : unreadMessages;
+                } else {
+                    topChatBadge.style.display = 'none';
+                }
+            }
+
+            if (topNotifBadge) {
+                if (unreadNotifs > 0) {
+                    topNotifBadge.style.display = 'flex';
+                    topNotifBadge.textContent = unreadNotifs > 9 ? '9+' : unreadNotifs;
+                } else {
+                    topNotifBadge.style.display = 'none';
+                }
+            }
+        } else {
+            if (topChatBadge) topChatBadge.style.display = 'none';
+            if (topNotifBadge) topNotifBadge.style.display = 'none';
+        }
+        if (!state.members) state.members = [];
+        const activeMembers = state.members.filter(m => (m.status === 'active' || (!m.status && m.status !== 'pending')) && m.role !== 'admin' && m.role !== 'admin_second');
 
         // 1. Render Pending Registrations (Admin View)
         const pendingMembers = state.members.filter(m => m.status === 'pending');
@@ -876,10 +1011,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Active members list (excluding admins)
-        const activeMembers = state.members.filter(m => m.status !== 'pending' && m.role !== 'admin' && m.role !== 'admin_second');
+        const activeClientMembers = state.members.filter(m => m.status !== 'pending' && m.role !== 'admin' && m.role !== 'admin_second');
 
         // Sort active members alphabetically
-        const sortedMembers = [...activeMembers].sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+        const sortedMembers = [...activeClientMembers].sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
 
         // Render Members Table (tab-membres)
         if (membersTableBody) {
@@ -946,9 +1081,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (transactionsTableBody) {
             transactionsTableBody.innerHTML = '';
             let filteredTx = state.transactions || [];
-            
+
             if (transactionSearchTerm) {
-                filteredTx = filteredTx.filter(tx => 
+                filteredTx = filteredTx.filter(tx =>
                     (tx.memberNom || '').toLowerCase().includes(transactionSearchTerm) ||
                     (tx.type === 'depot' ? 'dépôt depot'.includes(transactionSearchTerm) : 'retrait'.includes(transactionSearchTerm))
                 );
@@ -965,15 +1100,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     tr.innerHTML = `
                         <td>${reversedTransactions.length - index}</td>
                         <td>${new Date(tx.date).toLocaleDateString('fr-FR')}</td>
-                        <td class="text-muted">${new Date(tx.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</td>
+                        <td class="text-muted">${new Date(tx.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</td>
                         <td><span class="btn-action ${isDepot ? 'btn-success' : 'btn-danger'}" style="background-color:var(--${isDepot ? 'success' : 'danger'}); padding: 3px 8px; font-size: 0.75rem;">${isDepot ? 'Dépôt Cash' : 'Retrait Cash'}</span></td>
                         <td><strong>${tx.memberNom}</strong></td>
                         <td><span class="${isDepot ? 'text-success' : 'text-danger'}"><strong>${isDepot ? '+' : '-'}${tx.amount.toLocaleString('fr-FR')} Fc</strong></span></td>
+                        <td><span class="text-muted" style="font-size:0.85em;">${tx.adminNom || 'Admin'}</span></td>
                     `;
                     transactionsTableBody.appendChild(tr);
                 });
             } else {
-                transactionsTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding: 20px;">Aucune transaction correspondante.</td></tr>';
+                transactionsTableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding: 20px;">Aucune transaction correspondante.</td></tr>';
             }
         }
 
@@ -997,7 +1133,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (userWelcomeName) userWelcomeName.textContent = currentUser.nom;
             if (userPartsVal) userPartsVal.textContent = currentUser.parts || 0;
-            
+
             const userSolde = (currentUser.totalDepot || 0) - (currentUser.totalRetrait || 0);
             if (userSoldeVal) userSoldeVal.textContent = userSolde.toLocaleString('fr-FR');
             if (userTotalDepotsVal) userTotalDepotsVal.textContent = (currentUser.totalDepot || 0).toLocaleString('fr-FR');
@@ -1045,21 +1181,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         tr.innerHTML = `
                             <td>${rev.length - idx}</td>
                             <td>${new Date(tx.date).toLocaleDateString('fr-FR')}</td>
-                            <td class="text-muted">${new Date(tx.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</td>
+                            <td class="text-muted">${new Date(tx.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</td>
                             <td><span class="btn-action ${isDepot ? 'btn-success' : 'btn-danger'}" style="background-color:var(--${isDepot ? 'success' : 'danger'}); padding: 3px 8px; font-size: 0.75rem;">${isDepot ? 'Dépôt Cash' : 'Retrait Cash'}</span></td>
                             <td><span class="${isDepot ? 'text-success' : 'text-danger'}"><strong>${isDepot ? '+' : '-'}${tx.amount.toLocaleString('fr-FR')} Fc</strong></span></td>
+                            <td><span class="text-muted" style="font-size:0.85em;">${tx.adminNom || 'Admin'}</span></td>
                         `;
                         userTxTableBody.appendChild(tr);
                     });
                 } else {
-                    userTxTableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding: 20px;">Aucune transaction enregistrée pour votre compte.</td></tr>';
+                    userTxTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding: 20px;">Aucune transaction enregistrée pour votre compte.</td></tr>';
                 }
             }
 
             // User Notifications
             const userNotifList = document.getElementById('user-notifications-list');
             const unreadBadge = document.getElementById('unread-notif-badge');
-            
+
             const notifs = currentUser.notifications || [];
             const unreadCount = notifs.filter(n => !n.read).length;
 
@@ -1085,7 +1222,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         div.innerHTML = `
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                                 <strong style="color: var(--primary-dark); font-size: 0.95rem;">${n.read ? '🔔 Notification' : '🟢 Nouvelle Notification'}</strong>
-                                <small class="text-muted">${new Date(n.date).toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}</small>
+                                <small class="text-muted">${new Date(n.date).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</small>
                             </div>
                             <p style="margin: 0; font-size: 0.9rem; color: var(--text-main);">${n.message}</p>
                         `;
@@ -1162,6 +1299,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Render Secondary Admins
+        const secondaryAdminsList = document.getElementById('secondary-admins-list-tbody');
+        if (secondaryAdminsList) {
+            const secAdmins = state.members.filter(m => m.role === 'admin_second');
+            if (secAdmins.length === 0) {
+                secondaryAdminsList.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Aucun administrateur secondaire</td></tr>';
+            } else {
+                secondaryAdminsList.innerHTML = secAdmins.map(admin => `
+                    <tr>
+                        <td><strong>${admin.nom}</strong></td>
+                        <td>${admin.email}</td>
+                        <td style="text-align: center;">
+                            <button class="btn-action" onclick="window.deleteSecAdmin('${admin.id}')" style="background-color: var(--danger); color: white; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 5px 10px; border-radius: var(--radius-sm);" title="Supprimer cet admin">
+                                <span class="icon">🗑️</span> Supprimer
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
         // Render Messaging System
         renderMessaging();
     };
@@ -1175,18 +1333,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const userChatMessages = document.getElementById('user-chat-messages');
             const userUnreadBadge = document.getElementById('user-unread-msg-badge');
             const userMsgs = (state.messages || []).filter(m => String(m.memberId) === String(currentUser.id));
-            
+
             // Mark received admin messages as read when user views messaging tab
             const activeTab = document.querySelector('.tab-pane.active');
             if (activeTab && activeTab.id === 'tab-messagerie-user') {
-                let updated = false;
-                userMsgs.forEach(m => {
+                userMsgs.forEach(async m => {
                     if (m.sender === 'admin' && !m.readByUser) {
                         m.readByUser = true;
-                        updated = true;
+                        try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "messages", String(m.id)), { readByUser: true }); } catch (e) { }
                     }
                 });
-                if (updated) saveState();
             }
 
             const unreadUserCount = userMsgs.filter(m => m.sender === 'admin' && !m.readByUser).length;
@@ -1237,7 +1393,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const allMsgs = state.messages || [];
             const activeMembers = state.members.filter(m => m.status !== 'pending');
-            
+
             // Total unread messages for admin
             const totalAdminUnread = allMsgs.filter(m => m.sender === 'user' && !m.readByAdmin).length;
             if (adminUnreadBadge) {
@@ -1299,16 +1455,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             selectedAdminChatMemberId = m.id;
                             // Mark user messages as read by admin for this member
                             let markUpdated = false;
-                            mMsgs.forEach(msg => {
+                            mMsgs.forEach(async msg => {
                                 if (msg.sender === 'user' && !msg.readByAdmin) {
                                     msg.readByAdmin = true;
-                                    markUpdated = true;
+                                    try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "messages", String(msg.id)), { readByAdmin: true }); } catch (e) { }
                                 }
                             });
                             const chatGrid = document.querySelector('.admin-chat-grid');
                             if (chatGrid) chatGrid.classList.add('mobile-chat-open');
 
-                            if (markUpdated) saveState();
                             renderAll();
                         };
 
@@ -1381,7 +1536,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Chat Forms Event Handlers
     const userChatForm = document.getElementById('user-chat-form');
     if (userChatForm) {
-        userChatForm.addEventListener('submit', (e) => {
+        userChatForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const input = document.getElementById('user-chat-input');
             const text = input ? input.value.trim() : '';
@@ -1399,7 +1554,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     readByUser: true
                 };
                 state.messages.push(newMsg);
-                saveState();
+                try { await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "messages", String(newMsg.id)), newMsg); } catch (e) { }
                 renderAll();
                 if (input) input.value = '';
             }
@@ -1408,7 +1563,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const adminChatForm = document.getElementById('admin-chat-form');
     if (adminChatForm) {
-        adminChatForm.addEventListener('submit', (e) => {
+        adminChatForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const input = document.getElementById('admin-chat-input');
             const text = input ? input.value.trim() : '';
@@ -1439,7 +1594,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
 
-                saveState();
+                try {
+                    await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "messages", String(newMsg.id)), newMsg);
+                    if (targetMember) {
+                        await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(targetMember.id)), { notifications: targetMember.notifications });
+                    }
+                } catch (e) { }
+
                 renderAll();
                 if (input) { input.value = ''; input.style.height = 'auto'; }
             }
@@ -1449,7 +1610,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Broadcast Message Handler
     const btnBroadcast = document.getElementById('btn-broadcast-message');
     if (btnBroadcast) {
-        btnBroadcast.addEventListener('click', () => {
+        btnBroadcast.addEventListener('click', async () => {
             const annonce = prompt("Entrez le message ou l'annonce à envoyer à tous les utilisateurs :");
             if (annonce && annonce.trim() !== '') {
                 if (confirm(`Êtes-vous sûr de vouloir envoyer cette annonce à tous vos membres ?`)) {
@@ -1462,10 +1623,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     let count = 0;
                     const timestamp = new Date().toISOString();
                     const text = `📢 ANNONCE GÉNÉRALE: ${annonce.trim()}`;
-                    
-                    activeMembersList.forEach(member => {
+
+                    for (const member of activeMembersList) {
                         // Create chat message
-                        state.messages.push({
+                        const newMsg = {
                             id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
                             memberId: member.id,
                             sender: 'admin',
@@ -1474,8 +1635,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             timestamp: timestamp,
                             readByAdmin: true,
                             readByUser: false
-                        });
-                        
+                        };
+                        state.messages.push(newMsg);
+
+                        try {
+                            await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "messages", String(newMsg.id)), newMsg);
+                        } catch (e) { }
+
                         // Add notification
                         if (!member.notifications) member.notifications = [];
                         member.notifications.push({
@@ -1484,10 +1650,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             date: timestamp,
                             read: false
                         });
+
+                        try {
+                            await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(member.id)), {
+                                notifications: member.notifications
+                            });
+                        } catch (e) { }
+
                         count++;
-                    });
-                    
-                    saveState();
+                    }
                     showToast(`Annonce envoyée avec succès à ${count} membre(s) !`, "success");
                     renderAll();
                 }
@@ -1527,13 +1698,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const showToast = (message, type = 'success') => {
         let container = document.getElementById('toast-container');
         if (!container) return;
-        
+
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         toast.innerHTML = type === 'success' ? `✅ ${message}` : `❌ ${message}`;
-        
+
         container.appendChild(toast);
-        
+
         setTimeout(() => {
             toast.style.animation = 'fadeOut 0.3s ease forwards';
             setTimeout(() => toast.remove(), 300);
@@ -1560,10 +1731,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             operationAmountInput.value = '';
         }
-        
+
         const today = new Date().toISOString().split('T')[0];
         operationDateInput.value = today;
-        
+
         operationModal.classList.add('active');
         setTimeout(() => operationAmountInput.focus(), 100);
     };
@@ -1584,10 +1755,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    validateOperationBtn.addEventListener('click', () => {
+    validateOperationBtn.addEventListener('click', async () => {
         const amount = parseFloat(operationAmountInput.value);
         const opDate = operationDateInput.value;
-        
+
         if (!opDate) {
             showToast('Veuillez sélectionner une date.', 'error');
             return;
@@ -1598,52 +1769,52 @@ document.addEventListener('DOMContentLoaded', () => {
             if (memberIndex !== -1) {
                 const member = state.members[memberIndex];
                 const typeName = currentOperationType === 'depot' ? 'dépôt' : 'retrait';
-                
+
+                const maxDepot = (member.parts || 0) * 63000;
+                const maxRetrait = (member.parts || 0) * 62000;
+
+                if (currentOperationType === 'depot') {
+                    if ((member.totalDepot + amount) > maxDepot) {
+                        const reste = maxDepot - member.totalDepot;
+                        showToast(`Dépôt refusé : Le maximum pour ${member.parts || 0} part(s) est de ${maxDepot.toLocaleString('fr-FR')} Fc. Reste autorisé : ${reste.toLocaleString('fr-FR')} Fc.`, 'error');
+                        return;
+                    }
+                } else if (currentOperationType === 'retrait') {
+                    if ((member.totalRetrait + amount) > maxRetrait) {
+                        const reste = maxRetrait - member.totalRetrait;
+                        showToast(`Retrait refusé : Le maximum pour ${member.parts || 0} part(s) est de ${maxRetrait.toLocaleString('fr-FR')} Fc. Reste autorisé : ${reste.toLocaleString('fr-FR')} Fc.`, 'error');
+                        return;
+                    }
+                }
+
                 // Confirmation insistante
                 const isConfirmed = confirm(`Voulez-vous vraiment confirmer le ${typeName} de ${amount.toLocaleString('fr-FR')} Fc pour le membre ${member.nom} le ${new Date(opDate).toLocaleDateString('fr-FR')} ?\n\nCette action mettra à jour le solde.`);
-                
+
                 if (isConfirmed) {
-                    if (currentOperationType === 'depot') {
-                        member.totalDepot = (member.totalDepot || 0) + amount;
-                        state.dailyDepots = (state.dailyDepots || 0) + amount;
-                        state.cycleDepots = (state.cycleDepots || 0) + amount;
-                    } else {
-                        member.totalRetrait = (member.totalRetrait || 0) + amount;
-                        state.dailyRetraits = (state.dailyRetraits || 0) + amount;
-                        state.cycleRetraits = (state.cycleRetraits || 0) + amount;
+                    try {
+                        const res = await fetch(`${API.transactions}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                memberId: member.id,
+                                memberNom: member.nom,
+                                type: currentOperationType,
+                                amount: amount,
+                                adminNom: (currentUser ? currentUser.nom : 'Admin'),
+                                date: opDate
+                            })
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || "Erreur lors de l'opération.");
+
+                        await loadState();
+                        operationModal.classList.remove('active');
+                        showToast(`Le ${typeName} de ${amount.toLocaleString('fr-FR')} Fc (Cash) a été enregistré.`, 'success');
+
+                    } catch (error) {
+                        console.error("Erreur lors de l'enregistrement de l'opération :", error);
+                        showToast(error.message || "Erreur lors de l'enregistrement de l'opération.", "error");
                     }
-                    
-                    // Log the transaction
-                    if (!state.transactions) state.transactions = [];
-                    state.transactions.push({
-                        id: Date.now().toString(),
-                        memberId: member.id,
-                        memberNom: member.nom,
-                        type: currentOperationType,
-                        amount: amount,
-                        date: opDate,
-                        timestamp: new Date().toISOString()
-                    });
-
-                    // Add Notification to user account
-                    if (!member.notifications) member.notifications = [];
-                    const notifMsg = currentOperationType === 'depot' 
-                        ? `💵 Dépôt de ${amount.toLocaleString('fr-FR')} Fc enregistré en cash (liquidité) par l'administrateur le ${new Date(opDate).toLocaleDateString('fr-FR')}.`
-                        : `📤 Retrait de ${amount.toLocaleString('fr-FR')} Fc enregistré en cash (liquidité) par l'administrateur le ${new Date(opDate).toLocaleDateString('fr-FR')}.`;
-
-                    member.notifications.push({
-                        id: Date.now().toString(),
-                        message: notifMsg,
-                        date: new Date().toISOString(),
-                        read: false
-                    });
-
-                    saveState();
-                    renderAll();
-                    operationModal.classList.remove('active');
-                    
-                    // Message de succès non-bloquant
-                    showToast(`Le ${typeName} de ${amount.toLocaleString('fr-FR')} Fc (Cash) a été enregistré.`, 'success');
                 }
             }
         } else {
@@ -1652,21 +1823,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Member Edit, Delete & Details ---
-    window.deleteMember = (id) => {
+    window.deleteSecAdmin = async (id) => {
+        const admin = state.members.find(m => String(m.id) === String(id));
+        if (admin && confirm(`Voulez-vous vraiment supprimer l'administrateur secondaire "${admin.nom}" ?`)) {
+            try {
+                const res = await fetch(`${API.members}?action=delete&id=${id}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error("Erreur de suppression");
+                await loadState();
+                showToast('Administrateur secondaire supprimé avec succès.', 'success');
+            } catch (err) {
+                console.error(err);
+                showToast("Erreur lors de la suppression.", "error");
+            }
+        }
+    };
+
+    window.deleteMember = async (id) => {
         const member = state.members.find(m => String(m.id) === String(id));
         if (member && confirm(`Voulez-vous vraiment supprimer le membre "${member.nom}" ?`)) {
-            if (!state.deletedMembers) state.deletedMembers = [];
-            state.deletedMembers.push({
-                id: member.id,
-                email: (member.email || '').toLowerCase(),
-                nom: member.nom,
-                deletedAt: new Date().toISOString()
-            });
-
-            state.members = state.members.filter(m => String(m.id) !== String(id));
-            saveState();
-            renderAll();
-            showToast('Membre supprimé avec succès.', 'success');
+            try {
+                const res = await fetch(`${API.members}?action=delete&id=${id}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error("Erreur de suppression");
+                await loadState();
+                showToast('Membre supprimé avec succès.', 'success');
+            } catch (err) {
+                console.error(err);
+                showToast("Erreur lors de la suppression.", "error");
+            }
         }
     };
 
@@ -1686,24 +1869,26 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     if (saveEditMemberBtn) {
-        saveEditMemberBtn.addEventListener('click', () => {
+        saveEditMemberBtn.addEventListener('click', async () => {
             const id = editMemberIdInput.value;
             const newNom = editNomIdInput.value.trim();
             const newParts = parseInt(editPartsInput.value);
 
             if (newNom && newParts > 0) {
-                const memberIndex = state.members.findIndex(m => String(m.id) === String(id));
-                if (memberIndex !== -1) {
-                    state.members[memberIndex].nom = newNom;
-                    state.members[memberIndex].parts = newParts;
-                    saveState();
-                    renderAll();
-                    if (currentUser && currentUser.id === id) {
-                        currentUser = state.members[memberIndex];
-                        switchRoleView();
-                    }
+                try {
+                    const res = await fetch(`${API.members}?action=update`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id, nom: newNom, parts: newParts })
+                    });
+                    if (!res.ok) throw new Error("Erreur de mise à jour");
+
+                    await loadState();
                     if (editMemberModal) editMemberModal.classList.remove('active');
                     showToast('Membre mis à jour.', 'success');
+                } catch (err) {
+                    console.error(err);
+                    showToast("Erreur de mise à jour.", "error");
                 }
             }
         });
@@ -1717,25 +1902,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const depot = member.totalDepot || 0;
             const retrait = member.totalRetrait || 0;
             const solde = depot - retrait;
-            
+
             document.getElementById('details-total-depots').textContent = depot.toLocaleString('fr-FR') + ' Fc';
             document.getElementById('details-total-retraits').textContent = retrait.toLocaleString('fr-FR') + ' Fc';
             document.getElementById('details-solde').textContent = solde.toLocaleString('fr-FR') + ' Fc';
-            
+
             const promoteBtn = document.getElementById('promote-admin-btn');
             if (promoteBtn) {
                 // Show button ONLY if current user is the MAIN admin
                 const targetAdminEmail = (state.credentials && state.credentials.email) ? state.credentials.email.trim().toLowerCase() : 'zubiksservice@gmail.com';
                 if (currentUser && currentUser.role === 'admin' && (currentUser.email || '').toLowerCase() === targetAdminEmail) {
                     promoteBtn.style.display = 'inline-block';
-                    
+
                     if (member.role === 'admin_second') {
                         promoteBtn.textContent = 'Retirer droits Admin';
                         promoteBtn.style.backgroundColor = 'var(--danger-color, #e53e3e)';
-                        promoteBtn.onclick = () => {
+                        promoteBtn.onclick = async () => {
                             if (confirm(`Voulez-vous retirer les droits d'administrateur à ${member.nom} ?`)) {
                                 member.role = 'user';
-                                saveState();
+                                try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(member.id)), { role: 'user' }); } catch (e) { }
                                 showToast(`${member.nom} n'est plus administrateur.`, 'success');
                                 memberDetailsModal.classList.remove('active');
                                 renderAll();
@@ -1744,7 +1929,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         promoteBtn.textContent = 'Promouvoir Admin';
                         promoteBtn.style.backgroundColor = 'var(--warning-color, #dd6b20)';
-                        promoteBtn.onclick = () => {
+                        promoteBtn.onclick = async () => {
                             const adminSecondCount = state.members.filter(m => m.role === 'admin_second').length;
                             if (adminSecondCount >= 5) {
                                 showToast('Limite atteinte : Vous ne pouvez pas avoir plus de 5 administrateurs secondaires.', 'error');
@@ -1752,7 +1937,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                             if (confirm(`Voulez-vous promouvoir ${member.nom} comme Administrateur Secondaire ?\n\nIl aura accès au tableau de bord, mais sans les droits de sécurité.`)) {
                                 member.role = 'admin_second';
-                                saveState();
+                                try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(member.id)), { role: 'admin_second' }); } catch (e) { }
                                 showToast(`${member.nom} est maintenant administrateur secondaire !`, 'success');
                                 memberDetailsModal.classList.remove('active');
                                 renderAll();
@@ -1763,7 +1948,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     promoteBtn.style.display = 'none';
                 }
             }
-            
+
             memberDetailsModal.classList.add('active');
         }
     };
@@ -1778,7 +1963,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const dataStr = JSON.stringify(state, null, 2);
             const blob = new Blob([dataStr], { type: "application/json" });
             const url = URL.createObjectURL(blob);
-            
+
             const a = document.createElement('a');
             a.href = url;
             a.download = `zubix_backup_${new Date().toISOString().split('T')[0]}.json`;
@@ -1786,7 +1971,7 @@ document.addEventListener('DOMContentLoaded', () => {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            
+
             showToast('Base de données exportée avec succès.', 'success');
         });
     }
@@ -1804,50 +1989,107 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.onload = (event) => {
                 try {
                     const importedState = JSON.parse(event.target.result);
-                    
-                    if (confirm('Souhaitez-vous FUSIONNER les données importées avec vos données actuelles ?\n\n- OK = Fusionner sans écraser\n- Annuler = Remplacer toutes les données')) {
-                        // MERGE
-                        const incomingMembers = importedState.members || [];
-                        incomingMembers.forEach(incM => {
-                            const existing = state.members.find(m => m.id === incM.id || m.nom === incM.nom);
-                            if (existing) {
-                                existing.totalDepot = (existing.totalDepot || 0) + (incM.totalDepot || 0);
-                                existing.totalRetrait = (existing.totalRetrait || 0) + (incM.totalRetrait || 0);
-                            } else {
-                                state.members.push(incM);
+
+                    const processImport = async () => {
+                        const isMerge = confirm('Souhaitez-vous FUSIONNER les données importées avec vos données actuelles ?\n\n- OK = Fusionner sans écraser\n- Annuler = Remplacer toutes les données');
+
+                        if (!isMerge) {
+                            if (!confirm('Êtes-vous sûr de vouloir REMPLACER toutes vos données actuelles ? (Action irréversible)')) {
+                                importFileInput.value = '';
+                                return;
                             }
-                        });
-                        
-                        state.transactions = [...(state.transactions || []), ...(importedState.transactions || [])];
-                        state.archives = [...(state.archives || []), ...(importedState.archives || [])];
-                        state.dailyArchives = [...(state.dailyArchives || []), ...(importedState.dailyArchives || [])];
-                        
-                        state.dailyDepots = (state.dailyDepots || 0) + (importedState.dailyDepots || 0);
-                        state.dailyRetraits = (state.dailyRetraits || 0) + (importedState.dailyRetraits || 0);
-                        state.cycleDepots = (state.cycleDepots || 0) + (importedState.cycleDepots || 0);
-                        state.cycleRetraits = (state.cycleRetraits || 0) + (importedState.cycleRetraits || 0);
-                        
-                        saveState();
-                        showToast('Données fusionnées avec succès.', 'success');
-                    } else {
-                        if (confirm('Êtes-vous sûr de vouloir REMPLACER toutes vos données actuelles ? (Action irréversible)')) {
-                            state = importedState;
-                            if (!state.credentials) {
-                                state.credentials = {
-                                    email: 'zubiksservice@gmail.com',
-                                    password: 'Zubiks@2000'
-                                };
-                            }
-                            saveState();
-                            showToast('Base de données remplacée avec succès.', 'success');
-                        } else {
-                            importFileInput.value = '';
-                            return;
                         }
-                    }
-                    
+
+                        showToast("Synchronisation avec le Cloud en cours... Veuillez patienter.", "info");
+
+                        if (!isMerge) {
+                            // 1. Clear existing collections for replace
+                            const collectionsToClear = ["members", "transactions", "messages", "archives", "daily_archives", "deleted_members"];
+                            for (const collName of collectionsToClear) {
+                                try {
+                                    const snapshot = await window.firebaseGetDocs(window.firebaseCollection(window.firebaseDb, collName));
+                                    for (const d of snapshot.docs) {
+                                        if (collName === "members") {
+                                            const data = d.data();
+                                            if (data.role === 'admin' || data.role === 'admin_second') {
+                                                continue; // Keep admins
+                                            }
+                                        }
+                                        await window.firebaseDeleteDoc(d.ref);
+                                    }
+                                } catch (e) { }
+                            }
+                        }
+
+                        // 2. Upload Members
+                        for (const m of (importedState.members || [])) {
+                            try {
+                                if (isMerge) {
+                                    const existingSnap = await window.firebaseGetDoc(window.firebaseDoc(window.firebaseDb, "members", String(m.id)));
+                                    if (existingSnap.exists()) {
+                                        const existData = existingSnap.data();
+                                        await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(m.id)), {
+                                            totalDepot: (existData.totalDepot || 0) + (m.totalDepot || 0),
+                                            totalRetrait: (existData.totalRetrait || 0) + (m.totalRetrait || 0)
+                                        });
+                                    } else {
+                                        await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "members", String(m.id)), m);
+                                    }
+                                } else {
+                                    await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "members", String(m.id)), m);
+                                }
+                            } catch (e) { }
+                        }
+
+                        // 3. Upload other arrays
+                        const arraysToUpload = [
+                            { data: importedState.transactions, coll: "transactions" },
+                            { data: importedState.messages, coll: "messages" },
+                            { data: importedState.archives, coll: "archives" },
+                            { data: importedState.dailyArchives, coll: "daily_archives" },
+                            { data: importedState.deletedMembers, coll: "deleted_members" }
+                        ];
+
+                        for (const item of arraysToUpload) {
+                            for (const doc of (item.data || [])) {
+                                try {
+                                    const docId = doc.id || Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                                    await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, item.coll, String(docId)), doc);
+                                } catch (e) { }
+                            }
+                        }
+
+                        // 4. Global Stats
+                        try {
+                            if (isMerge) {
+                                await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "global", "stats"), {
+                                    dailyDepots: window.firebaseIncrement(importedState.dailyDepots || 0),
+                                    dailyRetraits: window.firebaseIncrement(importedState.dailyRetraits || 0),
+                                    cycleDepots: window.firebaseIncrement(importedState.cycleDepots || 0),
+                                    cycleRetraits: window.firebaseIncrement(importedState.cycleRetraits || 0)
+                                });
+                            } else {
+                                await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "global", "stats"), {
+                                    dailyDepots: importedState.dailyDepots || 0,
+                                    dailyRetraits: importedState.dailyRetraits || 0,
+                                    cycleDepots: importedState.cycleDepots || 0,
+                                    cycleRetraits: importedState.cycleRetraits || 0,
+                                    argentDebut: importedState.argentDebut || 0,
+                                    reglements: importedState.reglements || state.reglements || ""
+                                }, { merge: true });
+                            }
+                        } catch (e) { }
+
+                        showToast(isMerge ? 'Données fusionnées avec le Cloud avec succès.' : 'Base de données remplacée avec succès sur le Cloud.', 'success');
+
+                        // Force full reload from Firestore
+                        setTimeout(() => window.location.reload(), 1500);
+                    };
+
+                    processImport();
+
                     renderAll();
-                    
+
                     // Switch to home tab to refresh view smoothly
                     document.querySelector('[data-target="tab-accueil"]').click();
                 } catch (error) {
@@ -1863,105 +2105,171 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Archive Logic ---
     const archiveDailyBtn = document.getElementById('archive-daily-btn');
     if (archiveDailyBtn) {
-        archiveDailyBtn.addEventListener('click', () => {
+        archiveDailyBtn.addEventListener('click', async () => {
             if (confirm('Voulez-vous vraiment archiver la journée ? Cela remettra à zéro les compteurs journaliers.')) {
-                if (!state.dailyArchives) state.dailyArchives = [];
-                
-                state.dailyArchives.push({
-                    id: Date.now().toString(),
-                    date: new Date().toISOString(),
-                    dailyDepots: state.dailyDepots || 0,
-                    dailyRetraits: state.dailyRetraits || 0
-                });
-                
-                state.dailyDepots = 0;
-                state.dailyRetraits = 0;
-                
-                saveState();
-                renderAll();
-                showToast('Journée archivée avec succès.', 'success');
+                try {
+                    const { firebaseDb, firebaseDoc, firebaseCollection, firebaseWriteBatch } = window;
+                    const batch = firebaseWriteBatch(firebaseDb);
+
+                    // 1. Ajouter à daily_archives
+                    const archiveRef = firebaseDoc(firebaseCollection(firebaseDb, "daily_archives"));
+                    batch.set(archiveRef, {
+                        id: archiveRef.id,
+                        date: new Date().toISOString(),
+                        dailyDepots: state.dailyDepots || 0,
+                        dailyRetraits: state.dailyRetraits || 0
+                    });
+
+                    // 2. Réinitialiser les compteurs journaliers dans global/stats
+                    const statsRef = firebaseDoc(firebaseDb, "global", "stats");
+                    batch.set(statsRef, {
+                        dailyDepots: 0,
+                        dailyRetraits: 0
+                    }, { merge: true });
+
+                    await batch.commit();
+                    showToast('Journée archivée avec succès.', 'success');
+                } catch (error) {
+                    console.error("Erreur lors de l'archivage journalier:", error);
+                    showToast('Erreur lors de l\'archivage.', 'error');
+                }
             }
         });
     }
     if (archiveBtn) {
-        archiveBtn.addEventListener('click', () => {
+        archiveBtn.addEventListener('click', async () => {
             const confirmArchive = confirm('ARCHIVAGE : Cette action va sauvegarder le cycle actuel et réinitialiser les compteurs.\n\nVoulez-vous continuer ?');
             if (!confirmArchive) return;
 
             const wishBackup = confirm('Voulez-vous télécharger une sauvegarde (.json) avant la réinitialisation ?');
-            if (wishBackup && btnExportDb) {
+            if (wishBackup && typeof btnExportDb !== 'undefined' && btnExportDb) {
                 btnExportDb.click();
             }
 
-            // Sauvegarder le cycle dans les archives
-            const cycleSolde = (state.cycleDepots || 0) - (state.cycleRetraits || 0);
-            
-            const newArchive = {
-                id: Date.now().toString(),
-                date: new Date().toISOString(),
-                cycleDepots: state.cycleDepots || 0,
-                cycleRetraits: state.cycleRetraits || 0,
-                solde: cycleSolde,
-                membersSnapshot: JSON.parse(JSON.stringify(state.members || [])),
-                transactionsSnapshot: JSON.parse(JSON.stringify(state.transactions || []))
-            };
-            
-            if (!state.archives) state.archives = [];
-            state.archives.push(newArchive);
+            try {
+                showToast("Archivage en cours, veuillez patienter...", "info");
+                const { firebaseDb, firebaseDoc, firebaseCollection, firebaseWriteBatch, firebaseGetDocs } = window;
 
-            // Réinitialisation complète pour le nouveau cycle (0 membre)
-            state.dailyDepots = 0;
-            state.cycleDepots = 0;
-            state.dailyRetraits = 0;
-            state.cycleRetraits = 0;
-            state.argentDebut = 0;
-            state.transactions = [];
-            state.dailyArchives = [];
-            state.deletedMembers = [];
-            state.members = []; // 0 membre pour le nouveau cycle
-            state.messages = [];
+                // On utilise plusieurs batchs si besoin (Firebase limite à 500 opérations par batch)
+                // Pour simplifier et assurer la fiabilité, on fait les suppressions séquentiellement
 
-            saveState();
-            renderAll();
-            showToast('Nouveau cycle démarré avec 0 membre. Les utilisateurs peuvent à présent créer de nouveau leur compte.', 'success');
+                // 1. Sauvegarder l'archive
+                const cycleSolde = (state.cycleDepots || 0) - (state.cycleRetraits || 0);
+                const newArchive = {
+                    date: new Date().toISOString(),
+                    cycleDepots: state.cycleDepots || 0,
+                    cycleRetraits: state.cycleRetraits || 0,
+                    solde: cycleSolde,
+                    membersSnapshot: JSON.parse(JSON.stringify(state.members || [])),
+                    transactionsSnapshot: JSON.parse(JSON.stringify(state.transactions || []))
+                };
+
+                const archiveRef = firebaseDoc(firebaseCollection(firebaseDb, "archives"));
+                await window.firebaseSetDoc(archiveRef, newArchive);
+
+                // 2. Vider les collections (Membres, Transactions, Messages, DailyArchives)
+                const collectionsToClear = ["members", "transactions", "messages", "daily_archives"];
+
+                for (const collName of collectionsToClear) {
+                    const snap = await firebaseGetDocs(firebaseCollection(firebaseDb, collName));
+                    const deleteBatch = firebaseWriteBatch(firebaseDb);
+                    let count = 0;
+                    snap.forEach(docSnap => {
+                        deleteBatch.delete(docSnap.ref);
+                        count++;
+                    });
+                    if (count > 0) {
+                        await deleteBatch.commit(); // Note: if > 500 docs, this would fail. We assume < 500 for a single cycle in this MVP.
+                    }
+                }
+
+                // 3. Réinitialiser les stats globales
+                const statsRef = firebaseDoc(firebaseDb, "global", "stats");
+                await window.firebaseSetDoc(statsRef, {
+                    dailyDepots: 0,
+                    dailyRetraits: 0,
+                    cycleDepots: 0,
+                    cycleRetraits: 0,
+                    argentDebut: 0,
+                    reglements: state.reglements || "", // conserver les règlements
+                    credentials: state.credentials // conserver les identifiants
+                });
+
+                showToast('Nouveau cycle démarré avec 0 membre. Les utilisateurs peuvent à présent créer de nouveau leur compte.', 'success');
+            } catch (error) {
+                console.error("Erreur lors de la réinitialisation du cycle:", error);
+                showToast("Erreur critique lors de l'archivage.", "error");
+            }
         });
     }
 
     // --- Reset Database Logic ---
     const resetDatabaseBtn = document.getElementById('reset-database-btn');
     if (resetDatabaseBtn) {
-        resetDatabaseBtn.addEventListener('click', () => {
+        resetDatabaseBtn.addEventListener('click', async () => {
             const doubleConfirm = confirm("⚠️ ATTENTION : Êtes-vous sûr de vouloir réinitialiser COMPLÈTEMENT toutes les données ?\n\nCette action supprimera définitivement tous les membres, les transactions et tous les historiques d'archives.");
-            
+
             if (doubleConfirm) {
                 const passwordConfirm = prompt("Sécurité : Veuillez entrer le mot de passe administrateur pour confirmer la réinitialisation :");
-                
-                const targetPassword = (state.credentials && state.credentials.password) ? state.credentials.password : 'Zubiks@2000';
-                if (passwordConfirm === targetPassword) {
-                    // Reset to empty state template while keeping rules and credentials
+                if (!passwordConfirm) return;
+
+                try {
+                    await window.firebaseSignIn(window.firebaseAuth, currentUser.email, passwordConfirm);
+
+                    showToast("Suppression des données en cours, veuillez patienter...", "info");
+
+                    // 1. Delete all collections
+                    const collectionsToClear = ["members", "transactions", "messages", "archives", "daily_archives", "deleted_members"];
+                    for (const collName of collectionsToClear) {
+                        try {
+                            const snapshot = await window.firebaseGetDocs(window.firebaseCollection(window.firebaseDb, collName));
+                            for (const d of snapshot.docs) {
+                                if (collName === "members") {
+                                    const data = d.data();
+                                    if (data.role === 'admin' || data.role === 'admin_second') {
+                                        continue; // Keep admins
+                                    }
+                                }
+                                await window.firebaseDeleteDoc(d.ref);
+                            }
+                        } catch (e) {
+                            console.error("Erreur clear " + collName, e);
+                        }
+                    }
+
+                    // 2. Reset global stats
                     const currentReglements = state.reglements || "";
-                    const currentCredentials = state.credentials || {
-                        email: 'zubiksservice@gmail.com',
-                        password: 'Zubiks@2000'
-                    };
-                    state = {
-                        members: [],
-                        dailyDepots: 0,
-                        dailyRetraits: 0,
-                        cycleDepots: 0,
-                        cycleRetraits: 0,
-                        argentDebut: 0,
-                        reglements: currentReglements,
-                        archives: [],
-                        dailyArchives: [],
-                        transactions: [],
-                        credentials: currentCredentials
-                    };
-                    
-                    saveState();
+                    try {
+                        await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "global", "stats"), {
+                            dailyDepots: 0,
+                            dailyRetraits: 0,
+                            cycleDepots: 0,
+                            cycleRetraits: 0,
+                            argentDebut: 0,
+                            reglements: currentReglements,
+                            credentials: state.credentials || { email: 'zubiksservice@gmail.com' }
+                        });
+                    } catch (e) { 
+                        console.error("Erreur lors de la réinitialisation des stats globales :", e);
+                    }
+
+                    // 3. Update local state (preserve admins)
+                    state.members = state.members.filter(m => m.role === 'admin' || m.role === 'admin_second');
+                    state.transactions = [];
+                    state.messages = [];
+                    state.archives = [];
+                    state.dailyArchives = [];
+                    state.deletedMembers = [];
+                    state.dailyDepots = 0;
+                    state.dailyRetraits = 0;
+                    state.cycleDepots = 0;
+                    state.cycleRetraits = 0;
+                    state.argentDebut = 0;
+                    state.reglements = currentReglements;
+
                     renderAll();
                     showToast("Toutes les données ont été réinitialisées avec succès.", "success");
-                    
+
                     // Force refresh rules text area value
                     const textarea = document.querySelector('.modern-textarea');
                     if (textarea) textarea.value = currentReglements;
@@ -1969,10 +2277,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Populate change credentials email
                     const changeEmailInput = document.getElementById('change-email');
                     if (changeEmailInput) {
-                        changeEmailInput.value = currentCredentials.email;
+                        changeEmailInput.value = (state.credentials && state.credentials.email) ? state.credentials.email : 'zubiksservice@gmail.com';
                     }
-                } else if (passwordConfirm !== null) {
-                    showToast("Mot de passe incorrect. Réinitialisation annulée.", "error");
+                } catch (err) {
+                    console.error("Mot de passe incorrect pour réinitialisation :", err);
+                    showToast("Mot de passe incorrect.", "error");
                 }
             }
         });
@@ -1992,53 +2301,59 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const res = await fetch('/api/auth/credentials', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${currentJwtToken}`
-                    },
-                    body: JSON.stringify({ newEmail, newPassword })
-                });
-                const data = await res.json();
-                if (!res.ok || !data.success) {
-                    showToast(data.error || "Erreur lors de la mise à jour.", "error");
+                if (!window.firebaseAuth || !window.firebaseAuth.currentUser) {
+                    showToast("Vous devez être connecté pour modifier vos identifiants.", "error");
                     return;
                 }
 
+                const user = window.firebaseAuth.currentUser;
+
+                // 1. Mettre à jour l'email si modifié
+                if (user.email !== newEmail) {
+                    const lowerNewEmail = newEmail.toLowerCase();
+                    const existingMember = state.members.find(m => (m.email || '').toLowerCase() === lowerNewEmail);
+                    if (existingMember) {
+                        showToast("Cette adresse email est déjà utilisée par un autre membre.", "error");
+                        return;
+                    }
+                    await window.firebaseUpdateEmail(user, newEmail);
+                }
+
+                // 2. Mettre à jour le mot de passe
+                if (newPassword && newPassword.length >= 6) {
+                    await window.firebaseUpdatePassword(user, newPassword);
+                } else {
+                    showToast("Le mot de passe doit contenir au moins 6 caractères.", "warning");
+                    return;
+                }
+
+                // 3. Mettre à jour dans Firestore 'global/stats' (seulement l'email)
                 if (!state.credentials) state.credentials = {};
                 state.credentials.email = newEmail;
-                state.credentials.password = newPassword;
+
+                if (window.firebaseDb && window.firebaseDoc && window.firebaseUpdateDoc) {
+                    try {
+                        await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "global", "stats"), {
+                            'credentials.email': newEmail
+                        });
+                    } catch (e) { }
+                }
 
                 if (currentUser && currentUser.role === 'admin') {
                     currentUser.email = newEmail;
                     saveActiveSession(currentUser);
                 }
 
-                await saveState();
-
-                showToast("Identifiants de connexion mis à jour avec succès !", "success");
+                showToast("Identifiants mis à jour avec succès !", "success");
                 document.getElementById('change-password').value = '';
+
             } catch (err) {
-                const lowerNewEmail = newEmail.toLowerCase();
-                const existingMember = state.members.find(m => (m.email || '').toLowerCase() === lowerNewEmail);
-                if (existingMember) {
-                    showToast("Cette adresse email est déjà utilisée par un membre.", "error");
-                    return;
+                console.error("Erreur mise à jour credentials:", err);
+                if (err.code === 'auth/requires-recent-login') {
+                    showToast("Sécurité : Veuillez vous déconnecter et vous reconnecter avant de changer vos identifiants.", "error");
+                } else {
+                    showToast("Erreur de mise à jour Firebase.", "error");
                 }
-
-                if (!state.credentials) state.credentials = {};
-                state.credentials.email = newEmail;
-                state.credentials.password = newPassword;
-
-                if (currentUser && currentUser.role === 'admin') {
-                    currentUser.email = newEmail;
-                    saveActiveSession(currentUser);
-                }
-
-                saveState();
-                showToast("Identifiants de connexion mis à jour (mode local) !", "success");
-                document.getElementById('change-password').value = '';
             }
         });
     }
@@ -2047,19 +2362,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const textarea = document.querySelector('.modern-textarea');
     if (textarea) {
         textarea.value = state.reglements || "";
-        textarea.addEventListener('input', (e) => {
+        textarea.addEventListener('change', async (e) => {
             state.reglements = e.target.value;
-            saveState();
+            try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "global", "stats"), { reglements: state.reglements }); } catch (err) { }
         });
     }
 
     // --- Mark all notifications read ---
     const btnMarkAllRead = document.getElementById('btn-mark-all-read');
     if (btnMarkAllRead) {
-        btnMarkAllRead.addEventListener('click', () => {
+        btnMarkAllRead.addEventListener('click', async () => {
             if (currentUser && currentUser.role !== 'admin' && currentUser.notifications) {
                 currentUser.notifications.forEach(n => n.read = true);
-                saveState();
+                try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(currentUser.id)), { notifications: currentUser.notifications }); } catch (e) { }
                 renderAll();
                 showToast("Toutes vos notifications ont été marquées comme lues.", "success");
             }
@@ -2083,10 +2398,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const checkAndRestoreSession = () => {
         const savedSession = localStorage.getItem(SESSION_KEY);
+        const splashScreen = document.getElementById('splash-screen');
+        let sessionRestored = false;
+
         if (savedSession) {
             try {
                 const sess = JSON.parse(savedSession);
-                
+
                 // Auto-migrate session email if it's the old admin email
                 if (sess.email && sess.email.toLowerCase() === 'obedtechn02@gmail.com') {
                     sess.email = 'zubiksservice@gmail.com';
@@ -2121,11 +2439,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateDates();
                     renderAll();
                     console.log("Session restaurée automatiquement.");
+                    sessionRestored = true;
                 }
             } catch (e) {
                 console.error("Erreur lors de la restauration de la session :", e);
                 localStorage.removeItem(SESSION_KEY);
             }
+        }
+
+        if (!sessionRestored) {
+            if (loginScreen) loginScreen.classList.add('active');
+            if (dashboardScreen) dashboardScreen.classList.remove('active');
+        }
+
+        // Cache toujours le splash screen à la fin du chargement
+        if (splashScreen) {
+            splashScreen.style.opacity = '0';
+            setTimeout(() => {
+                splashScreen.classList.remove('active');
+                splashScreen.style.display = 'none';
+            }, 300); // Transition douce
         }
     };
 
@@ -2137,12 +2470,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const nom = document.getElementById('sec-admin-name').value.trim();
             const email = document.getElementById('sec-admin-email').value.trim();
             const password = document.getElementById('sec-admin-password').value;
-            
+
             if (!nom || !email || !password) {
                 showToast("Veuillez remplir tous les champs.", "error");
                 return;
             }
-            
+
             try {
                 if (window.firebaseAuth && window.firebaseSignUp) {
                     await window.firebaseSignUp(window.firebaseAuth, email, password);
@@ -2154,19 +2487,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
             }
-            
+
             const newAdmin = {
                 id: 'admin_' + Date.now(),
                 nom: nom,
                 email: email,
-                password: password,
                 role: 'admin_second',
                 status: 'active',
                 dateAjout: new Date().toISOString()
             };
-            
+
             state.members.push(newAdmin);
-            await saveState();
+            try { await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "members", String(newAdmin.id)), newAdmin); } catch (e) { }
             renderAll();
             createSecAdminForm.reset();
             showToast("Administrateur secondaire créé avec succès.", "success");
@@ -2175,9 +2507,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // Initialize
-    loadState().then(() => {
+    const initializeAppUi = () => {
+        // Fonctions d'initialisation de l'interface (boutons supprimés)
+    };
+
+    let initDone = false;
+    const finishInit = () => {
+        if (initDone) return;
+        initDone = true;
         checkAndRestoreSession();
-    }).catch(() => {
-        checkAndRestoreSession();
-    });
+        initializeAppUi();
+    };
+
+    if (window.firebaseOnAuthStateChanged) {
+        let isFirstLoad = true;
+        window.firebaseOnAuthStateChanged(window.firebaseAuth, (user) => {
+            if (user) {
+                loadState().then(() => {
+                    if (isFirstLoad) { isFirstLoad = false; finishInit(); }
+                }).catch(() => {
+                    if (isFirstLoad) { isFirstLoad = false; finishInit(); }
+                });
+            } else {
+                if (isFirstLoad) { isFirstLoad = false; finishInit(); }
+            }
+        });
+        
+        // Timeout de sécurité au cas où Firebase Auth ne répond pas
+        setTimeout(() => {
+            if (isFirstLoad) {
+                console.warn("Firebase Auth timeout, fallback local...");
+                isFirstLoad = false;
+                finishInit();
+            }
+        }, 3000);
+    } else {
+        loadState().then(finishInit).catch(finishInit);
+    }
 });

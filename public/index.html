@@ -13,31 +13,69 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#059669">
+    <link rel="apple-touch-icon" href="icon-512.png">
+
+    <!-- PWA iOS Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Zubiks">
+
+    <!-- EmailJS SDK -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script type="text/javascript">
+        (function () {
+            emailjs.init({
+                publicKey: "8YpcdEI31a-Y81ilz",
+            });
+        })();
+    </script>
 </head>
 
 <body>
+    <!-- Ecran de Chargement (Splash Screen) -->
+    <div id="splash-screen" class="screen active"
+        style="flex-direction: column; justify-content: center; align-items: center; background: var(--bg-main); z-index: 99999;">
+        <div class="login-brand-tag" style="animation: pulse 1.5s infinite; background: rgba(16, 185, 129, 0.1);">
+            <div class="brand-tag-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+            </div>
+            <span style="font-size: 1.5rem; margin-left: 10px;">ZUBIKS SERVICE</span>
+        </div>
+        <p class="text-muted mt-10" style="font-weight: 500;">Connexion sécurisée en cours...</p>
+    </div>
+
     <!-- Ecran de Connexion (Ultra Premium Design) -->
-    <div id="login-screen" class="screen active login-split">
+    <div id="login-screen" class="screen login-split">
         <div class="login-visual">
             <div class="visual-overlay"></div>
             <div class="visual-content">
                 <div class="login-brand-tag">
                     <div class="brand-tag-icon">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                         </svg>
                     </div>
                     <span>ZUBIKS SERVICE</span>
                 </div>
-                
+
                 <h1>L'Excellence<br>Financière</h1>
-                <p>La plateforme haut de gamme pour la gestion transparente et sécurisée de vos capitaux, ristournes et opérations en cash.</p>
-                
+                <p>La plateforme haut de gamme pour la gestion transparente et sécurisée de vos capitaux, ristournes et
+                    opérations en cash.</p>
+
                 <div class="visual-features">
                     <div class="feature-card">
                         <div class="feature-icon">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
                         </div>
                         <div class="feature-info">
                             <h4>Sécurité Bancaire</h4>
@@ -46,7 +84,10 @@
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
                         </div>
                         <div class="feature-info">
                             <h4>Cycles Dynamiques</h4>
@@ -56,13 +97,14 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="login-form-container">
             <div class="login-card">
                 <!-- En-tête du Formulaire -->
                 <div class="login-card-header">
                     <div class="login-mini-logo">
-                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                         </svg>
@@ -81,24 +123,29 @@
 
                 <!-- Formulaire de Connexion -->
                 <div id="login-form-wrapper">
-                    <form id="login-form">
+                    <form id="login-form" novalidate>
                         <div class="input-group">
                             <label for="email">Adresse Email</label>
                             <div class="input-with-icon">
                                 <span class="input-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path
+                                            d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z">
+                                        </path>
                                         <polyline points="22,6 12,13 2,6"></polyline>
                                     </svg>
                                 </span>
-                                <input type="email" id="email" placeholder="votre.email@exemple.com" required>
+                                <input type="text" inputmode="email" id="email" placeholder="votre.email@exemple.com"
+                                    required>
                             </div>
                         </div>
                         <div class="input-group">
                             <label for="password">Mot de passe</label>
                             <div class="input-with-icon">
                                 <span class="input-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                     </svg>
@@ -106,7 +153,8 @@
                                 <input type="password" id="password" placeholder="••••••••" required>
                             </div>
                         </div>
-                        <div class="forgot-link-wrapper" style="text-align: right; margin-top: 6px; margin-bottom: 15px;">
+                        <div class="forgot-link-wrapper"
+                            style="text-align: right; margin-top: 6px; margin-bottom: 15px;">
                             <button type="button" id="link-forgot-password" class="auth-link-forgot">
                                 Mot de passe oublié ?
                             </button>
@@ -123,12 +171,13 @@
                     <button id="btn-back-to-login" type="button" class="btn-back-link">
                         ← Retour à la connexion
                     </button>
-                    <form id="register-form">
+                    <form id="register-form" novalidate>
                         <div class="input-group">
                             <label for="reg-nom">Nom</label>
                             <div class="input-with-icon">
                                 <span class="input-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                                         <circle cx="12" cy="7" r="4"></circle>
                                     </svg>
@@ -140,7 +189,8 @@
                             <label for="reg-postnom">Post-Nom</label>
                             <div class="input-with-icon">
                                 <span class="input-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                                         <circle cx="12" cy="7" r="4"></circle>
                                     </svg>
@@ -159,19 +209,24 @@
                             <label for="reg-email">Adresse email</label>
                             <div class="input-with-icon">
                                 <span class="input-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path
+                                            d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z">
+                                        </path>
                                         <polyline points="22,6 12,13 2,6"></polyline>
                                     </svg>
                                 </span>
-                                <input type="email" id="reg-email" placeholder="votre.email@exemple.com" required>
+                                <input type="text" inputmode="email" id="reg-email"
+                                    placeholder="votre.email@exemple.com" required>
                             </div>
                         </div>
                         <div class="input-group">
                             <label for="reg-password">Mot de passe</label>
                             <div class="input-with-icon">
                                 <span class="input-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                     </svg>
@@ -188,7 +243,8 @@
                                 ← Déjà inscrit ? Se connecter
                             </button>
                         </div>
-                        <p class="text-muted text-center mt-10" style="font-size: 0.82rem; line-height: 1.4;">💡 Après l'inscription, l'administrateur validera le nombre de vos parts pour activer votre compte.
+                        <p class="text-muted text-center mt-10" style="font-size: 0.82rem; line-height: 1.4;">💡 Après
+                            l'inscription, l'administrateur validera le nombre de vos parts pour activer votre compte.
                         </p>
                     </form>
                 </div>
@@ -203,8 +259,11 @@
                             <label for="forgot-email">Votre adresse email</label>
                             <div class="input-with-icon">
                                 <span class="input-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path
+                                            d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z">
+                                        </path>
                                         <polyline points="22,6 12,13 2,6"></polyline>
                                     </svg>
                                 </span>
@@ -232,24 +291,28 @@
                             <label for="reset-new-password">Nouveau mot de passe</label>
                             <div class="input-with-icon">
                                 <span class="input-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                     </svg>
                                 </span>
-                                <input type="password" id="reset-new-password" placeholder="••••••••" required minlength="6">
+                                <input type="password" id="reset-new-password" placeholder="••••••••" required
+                                    minlength="6">
                             </div>
                         </div>
                         <div class="input-group">
                             <label for="reset-confirm-password">Confirmer le nouveau mot de passe</label>
                             <div class="input-with-icon">
                                 <span class="input-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                     </svg>
                                 </span>
-                                <input type="password" id="reset-confirm-password" placeholder="••••••••" required minlength="6">
+                                <input type="password" id="reset-confirm-password" placeholder="••••••••" required
+                                    minlength="6">
                             </div>
                         </div>
                         <button type="submit" class="btn-primary btn-reset-submit">
@@ -272,7 +335,7 @@
         <!-- Sidebar Navigation -->
         <aside class="sidebar" id="app-sidebar">
             <div class="sidebar-header">
-                <h2>ZUBIKS <span>ZD</span></h2>
+                <h2>ZUBIKS <span style="color: var(--primary-color);">ZS</span></h2>
                 <button id="close-sidebar-btn" class="close-sidebar-btn" aria-label="Fermer le menu">&times;</button>
             </div>
             <nav class="sidebar-nav">
@@ -339,19 +402,85 @@
 
         <!-- Main Content Area -->
         <main class="main-content">
-            <header class="top-header">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Menu Mobile">☰</button>
-                    <div class="header-title">
+            <header class="top-header"
+                style="display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; background: white; border-bottom: 1px solid #edf2f7; width: 100%;">
+
+                <!-- Section Gauche -->
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <!-- Menu Hamburger -->
+                    <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Menu Mobile"
+                        style="background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
+                        </svg>
+                    </button>
+
+                    <!-- Logo Bleu -->
+                    <div
+                        style="width: 34px; height: 34px; background-color: #0066FF; border-radius: 4px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                        <div
+                            style="position: absolute; top: -5px; left: -5px; width: 18px; height: 18px; background: #e0f2fe; border-radius: 4px;">
+                        </div>
+                    </div>
+
+                    <!-- Eléments originaux cachés pour maintenir la fonctionnalité JS -->
+                    <div class="header-title" style="display: none !important;">
                         <h1 id="page-title">Accueil</h1>
                     </div>
                 </div>
-                <div class="header-user">
-                    <span id="user-role-badge"
-                        style="background: var(--primary-light); color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">Admin</span>
-                    <span class="user-name" id="logged-user-name">Admin ZUBIKS</span>
-                    <div class="avatar" id="logged-user-avatar">AZ</div>
-                    <button id="header-logout-btn" style="display: none;"></button>
+
+                <!-- Section Droite -->
+                <div class="header-user" style="display: flex; align-items: center; gap: 20px;">
+                    <!-- Icône Chat -->
+                    <button id="top-chat-btn"
+                        style="background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; color: #666; position: relative;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span id="top-chat-badge" class="badge" style="display: none; position: absolute; top: -5px; right: -5px; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; align-items: center; justify-content: center; padding: 0; background-color: #ef4444; color: white;"></span>
+                    </button>
+
+                    <!-- Icône Cloche -->
+                    <button id="top-notif-btn"
+                        style="background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; color: #666; position: relative;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <span id="top-notif-badge" class="badge" style="display: none; position: absolute; top: -5px; right: -5px; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; align-items: center; justify-content: center; padding: 0; background-color: #ef4444; color: white;"></span>
+                    </button>
+
+                    <!-- Icône Thème -->
+                    <button id="theme-toggle" class="theme-toggle-btn" aria-label="Basculer le thème"
+                        style="background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">🌙</button>
+
+                    <!-- Eléments originaux cachés -->
+                    <span id="user-role-badge" style="display: none !important;">Admin</span>
+                    <span class="user-name" id="logged-user-name" style="display: none !important;">Admin ZUBIKS</span>
+
+                    <!-- Avatar Utilisateur -->
+                    <div class="avatar" id="logged-user-avatar"
+                        style="width: 42px; height: 42px; background-color: #0055FF; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; cursor: pointer; text-transform: uppercase; position: relative; overflow: hidden;">
+                        HO</div>
+                    <input type="file" id="profile-photo-input" accept="image/*" style="display: none;">
+
+                    <!-- Bouton Déconnexion -->
+                    <button id="header-logout-btn"
+                        style="width: 42px; height: 42px; background-color: #FFF0F0; border: none; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-left: 4px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF4D4D" stroke-width="2.5"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                    </button>
+
+                    <!-- Dates cachées -->
                     <span id="payment-date-display" style="display: none;"></span>
                     <span id="daily-start" style="display: none;"></span>
                     <span id="cycle-start" style="display: none;"></span>
@@ -367,6 +496,7 @@
                         <p>Aperçu rapide de votre activité d'aujourd'hui. Les paiements s'effectuent uniquement en cash
                             (liquidité).</p>
                     </div>
+
 
                     <div class="stats-grid">
                         <div class="stat-card glass-inner">
@@ -511,6 +641,7 @@
                                         <th>Heure</th>
                                         <th>Type</th>
                                         <th>Montant (Cash)</th>
+                                        <th>Validé par</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -736,11 +867,21 @@
                                 <p class="text-muted" style="margin: 0;">Registre chronologique des dépôts et retraits.
                                 </p>
                             </div>
-                            <div class="responsive-filter-group">
+                            <div class="responsive-filter-group"
+                                style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                                 <input type="date" id="filter-transaction-date"
-                                    class="large-input responsive-date-input">
+                                    class="large-input responsive-date-input" style="flex: 1;">
                                 <input type="text" id="search-transaction-input"
-                                    class="large-input responsive-search-input" placeholder="Recherche (nom, type)">
+                                    class="large-input responsive-search-input" placeholder="Recherche (nom, type)"
+                                    style="flex: 2;">
+                                <button id="export-transactions-pdf" class="btn-primary"
+                                    style="background-color: var(--warning); display: inline-flex; align-items: center; gap: 5px;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                                    </svg>
+                                    PDF
+                                </button>
                             </div>
                         </div>
                         <div class="table-responsive">
@@ -753,6 +894,7 @@
                                         <th>Type</th>
                                         <th>Membre</th>
                                         <th>Montant</th>
+                                        <th>Validé par</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -772,7 +914,9 @@
                                 style="border-right: 1px solid #e2e8f0; background: #f8fafc; padding: 15px; display: flex; flex-direction: column;">
                                 <h4 style="margin-bottom: 12px; color: var(--primary-color);">💬 Conversations Client
                                 </h4>
-                                <button id="btn-broadcast-message" class="btn-warning w-100" type="button" style="font-size: 0.85rem; padding: 10px; margin-bottom: 12px; border-radius: 8px;">📢 Envoyer une annonce à tous</button>
+                                <button id="btn-broadcast-message" class="btn-warning w-100" type="button"
+                                    style="font-size: 0.85rem; padding: 10px; margin-bottom: 12px; border-radius: 8px;">📢
+                                    Envoyer une annonce à tous</button>
                                 <input type="text" id="search-chat-member" placeholder="Rechercher un membre..."
                                     style="padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; margin-bottom: 12px;">
                                 <div id="admin-chat-threads"
@@ -933,262 +1077,446 @@
                 <div id="tab-apropos" class="tab-pane fade-in">
                     <div style="display: flex; flex-direction: column; gap: 24px; width: 100%;">
                         <!-- Colonne Unique : Présentation & Règlements -->
-                            <!-- Carte de présentation institutionnelle -->
-                            <div class="panel glass-panel" style="border-left: 4px solid var(--primary-color);">
-                                <h3 style="color: var(--primary-color);">🏢 ZUBIKS SERVICE - Plateforme Officielle</h3>
-                                <p class="text-muted" style="line-height: 1.6; margin-bottom: 15px;">Solution dynamique
-                                    de gestion de ristournes, tontines, dépôts et retraits de fonds pour les membres
-                                    inscrits. Tous les versements sont traités exclusivement en <strong>Cash
-                                        (Liquidité)</strong> auprès de l'administrateur.</p>
-                                <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 15px;">
-                                    <div class="glass-inner" style="padding: 10px 15px; font-size: 0.85rem;">
-                                        <strong>Base de données :</strong> <span id="db-status-badge" class="badge"
-                                            style="background: var(--success); color: white; padding: 2px 8px; border-radius: 10px;">Dynamique
-                                            JSON</span>
-                                    </div>
-                                    <div class="glass-inner" style="padding: 10px 15px; font-size: 0.85rem;">
-                                        <strong>Mode de Paiement :</strong> <span class="badge"
-                                            style="background: #2b6cb0; color: white; padding: 2px 8px; border-radius: 10px;">Cash
-                                            Liquidité</span>
-                                    </div>
+                        <!-- Carte de présentation institutionnelle -->
+                        <div class="panel glass-panel" style="border-left: 4px solid var(--primary-color);">
+                            <h3 style="color: var(--primary-color);">🏢 ZUBIKS SERVICE - Plateforme Officielle</h3>
+                            <p class="text-muted" style="line-height: 1.6; margin-bottom: 15px;">Solution dynamique
+                                de gestion de ristournes, tontines, dépôts et retraits de fonds pour les membres
+                                inscrits. Tous les versements sont traités exclusivement en <strong>Cash
+                                    (Liquidité)</strong> auprès de l'administrateur.</p>
+                            <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 15px;">
+                                <div class="glass-inner" style="padding: 10px 15px; font-size: 0.85rem;">
+                                    <strong>Base de données :</strong> <span id="db-status-badge" class="badge"
+                                        style="background: var(--success); color: white; padding: 2px 8px; border-radius: 10px;">Dynamique
+                                        JSON</span>
                                 </div>
-                            </div>
-
-                            <!-- Panel Règlements d'Ordre Intérieur (Non Modifiable) -->
-                            <div class="panel glass-panel roi-container">
-                                <div class="roi-header">
-                                    <span class="roi-badge">OFFICIEL & NON MODIFIABLE</span>
-                                    <h2>ZUBIKS SERVICES</h2>
-                                    <p class="roi-slogan">VIVRE POUR LES AUTRES</p>
-                                    <p class="roi-subtext">CRÉDIT, GESTION MOBILIÈRE ET IMMOBILIÈRE, SOUS-TRAITANCE,
-                                        SERVICE TRAITEUR ET PROTOCOLE, ÉPARGNE ET RISTOURNE, ÉDUCATION ET ENCADREMENT
-                                        DES JEUNES, ENTREPRENEURIAT</p>
-                                    <div class="roi-divider"></div>
-                                    <h3>DÉPARTEMENT : RISTOURNE</h3>
-                                    <h4 class="roi-title">RÈGLEMENT D'ORDRE INTÉRIEUR (R.O.I)</h4>
-                                </div>
-
-                                <div class="roi-articles">
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 1</span>
-                                        <p>Notre ristourne regorge toute personne qui possède une activité génératrice
-                                            de revenu sans distinction de race, tribu ou religion et est dénommée «
-                                            <strong>RISTOURNE POUR LE RELÈVEMENT ÉCONOMIQUE AIDONS NOUS VIVANTS</strong>
-                                            » ;
-                                        </p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 2</span>
-                                        <p>La durée d’un cycle de la ristourne est de 9 semaines soit 63 jours ; elle se
-                                            paie journalièrement à 1000 FC comme une part et cette dernière est payée
-                                            selon le niveau de chacun, c.-à-d. même à 100 parts (100 000 FC/jour) ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 3</span>
-                                        <p>Tout membre doit avoir un carnet dans lequel sont enregistrés ses paiements
-                                            quotidiennes et approuvés par une signature de l’agent recouvreur (AR) ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 4</span>
-                                        <p>Tout membre est tenu au strict respect de vérifier si son argent a été bel et
-                                            bien enregistré dans son carnet car la signature égale l’argent et sans elle
-                                            donc pas d’argent car dit-on la confiance n’exclut pas le contrôle ; en cas
-                                            d’une anomalie constatée ou pour toute autre information relative avec le
-                                            service, le membre est tenu à contacter le responsable avant 24 heures ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 5</span>
-                                        <p>Pour raison de sécurité pour tous, le recouvrement est fait à partir de 16
-                                            heures jusqu’à 18 heures sauf en cas d’un désagrément, mais aussi le membre
-                                            doit préparer son carnet et l’argent pour ne pas perdre le temps ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 6</span>
-                                        <p>Nous libérons l’argent après une semaine, chaque lundi et/ou mardi, c.-à-d.
-                                            le retrait est hebdomadaire ; c’est ainsi le membre doit patienter ces deux
-                                            jours car il n’y a pas une urgence urgente dit-on ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 7</span>
-                                        <p>Le retrait doit se faire pendant les heures de travail allant de 8h00 jusqu’à
-                                            16h00. Contrairement à ces heures, l’argent ne sera pas libéré ; outre, le
-                                            membre doit se munir de son carnet lors du retrait pour référence car
-                                            personne ne recevra ou retirera pas sans le carnet ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 8</span>
-                                        <p>Le mouvement ou le comment est fait le retrait se fait soit par tirage soit
-                                            par non tirage, cela dépend des circonstances et faisabilités. Si pas par
-                                            tirage, le retrait est conditionné par le comment le membre paie
-                                            (ponctualité) et la demande du membre ; le nouveau membre retire dans la
-                                            dernière semaine de la fin du cycle et surtout tout membre qui a mal terminé
-                                            le précédent cycle sera aussi comme un nouveau membre ; si le membre ne paie
-                                            pas normalement, il retirera le montant compatible avec là où est son
-                                            mouvement ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 9</span>
-                                        <p>Tout membre qui n’a pas bien terminé le cycle précédent doit laisser cette
-                                            somme sur son argent comme gage ; s’il termine sans faille, on lui remet son
-                                            argent. Sinon, cette somme servira pour terminer son cycle, et se fait comme
-                                            suit : 62-60, 124-120, 186-180, 248-240, 310-300, 372-360, 434-420, 620-6000
-                                            ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 10</span>
-                                        <p>Le membre qui échoue le projet ou son cycle doit patienter la fin de ce
-                                            dernier pour retirer et il paiera une amende, pour ne pas terminer le cycle,
-                                            de : 1 part à 2 parts = 5000 FC ; 3 aux 6 parts = 10000 FC ; 7 aux 10 parts
-                                            = 15000 FC ; 11 aux 20 parts = 20000 FC ; 21 aux 50 parts = 35000 FC ; 50
-                                            au-delà = 50000 FC. Nb : l’amende est payée si et seulement si le membre
-                                            dépasse 1 jour de fin de cycle ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 11</span>
-                                        <p>Il est interdit à tout membre de lancer la demande du retrait avant que le
-                                            cycle ne commence ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 12</span>
-                                        <p>Les membres actifs du présent cycle doivent poser leurs signatures sur la
-                                            liste pour approuver qu’ils aient pris connaissance de ce ROI et doivent
-                                            appliquer ce dernier ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 13</span>
-                                        <p>Le membre ne doit faire le dépôt sans signature de l’AR et surtout que ce
-                                            dernier ne doit pas prendre l’argent sans poser sa signature ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 14</span>
-                                        <p>Pour le retrait, tout membre doit annoncer une semaine avant pour bien
-                                            étudier son cas, car toute réponse dépendra du mouvement de dépôt de membre
-                                            et surtout des nombres de demandes… ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 15</span>
-                                        <p>Le cycle se termine à 9 semaines pour tout le monde ; si le membre n’a pas
-                                            terminé, soit il a une dette, ce dernier ne peut pas continuer à payer ce
-                                            présent cycle dans le suivant dans l’angle où il veut faire deux cycles en
-                                            un seul ; si tel est le cas, il paiera les frais de fonctionnement du
-                                            service qui est la somme recouvrée le tout premier jour du cycle ;
-                                            toutefois, il peut laisser son argent pour le retirer une fois pour toute
-                                            après un, deux ou plusieurs cycles et cela sans intérêt ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 16</span>
-                                        <p>L’agent recouvreur prendra chaque dimanche ou lundi les carnets de tous les
-                                            membres afin d’une évaluation hebdomadaire ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 17</span>
-                                        <p>À chaque début d’une phase ou cycle de la ristourne, chaque membre inscrit
-                                            doit approuver son enregistrement ou confirmer en signant à ce ROI ;</p>
-                                    </div>
-                                    <div class="roi-article-card">
-                                        <span class="article-num">Art. 18</span>
-                                        <p>Pour le social, tout membre devra payer hebdomadairement 500 FC afin
-                                            d’assister aux événements heureux et malheureux à nos membres.</p>
-                                    </div>
-                                </div>
-
-                                <div class="roi-footer">
-                                    <p>POUR LE DÉPARTEMENT</p>
-                                    <strong>CHEF DU DÉPARTEMENT</strong>
+                                <div class="glass-inner" style="padding: 10px 15px; font-size: 0.85rem;">
+                                    <strong>Mode de Paiement :</strong> <span class="badge"
+                                        style="background: #2b6cb0; color: white; padding: 2px 8px; border-radius: 10px;">Cash
+                                        Liquidité</span>
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Panel Règlements d'Ordre Intérieur (Non Modifiable) -->
+                        <div class="panel glass-panel roi-container">
+                            <div class="roi-header">
+                                <span class="roi-badge">OFFICIEL & NON MODIFIABLE</span>
+                                <h2>ZUBIKS SERVICES</h2>
+                                <p class="roi-slogan">VIVRE POUR LES AUTRES</p>
+                                <p class="roi-subtext">CRÉDIT, GESTION MOBILIÈRE ET IMMOBILIÈRE, SOUS-TRAITANCE,
+                                    SERVICE TRAITEUR ET PROTOCOLE, ÉPARGNE ET RISTOURNE, ÉDUCATION ET ENCADREMENT
+                                    DES JEUNES, ENTREPRENEURIAT</p>
+                                <div class="roi-divider"></div>
+                                <h3>DÉPARTEMENT : RISTOURNE</h3>
+                                <h4 class="roi-title">RÈGLEMENT D'ORDRE INTÉRIEUR (R.O.I)</h4>
+                            </div>
+
+                            <div class="roi-articles">
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 1</span>
+                                    <p>Notre ristourne regorge toute personne qui possède une activité génératrice
+                                        de revenu sans distinction de race, tribu ou religion et est dénommée «
+                                        <strong>RISTOURNE POUR LE RELÈVEMENT ÉCONOMIQUE AIDONS NOUS VIVANTS</strong>
+                                        » ;
+                                    </p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 2</span>
+                                    <p>La durée d’un cycle de la ristourne est de 9 semaines soit 63 jours ; elle se
+                                        paie journalièrement à 1000 FC comme une part et cette dernière est payée
+                                        selon le niveau de chacun, c.-à-d. même à 100 parts (100 000 FC/jour) ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 3</span>
+                                    <p>Tout membre doit avoir un carnet dans lequel sont enregistrés ses paiements
+                                        quotidiennes et approuvés par une signature de l’agent recouvreur (AR) ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 4</span>
+                                    <p>Tout membre est tenu au strict respect de vérifier si son argent a été bel et
+                                        bien enregistré dans son carnet car la signature égale l’argent et sans elle
+                                        donc pas d’argent car dit-on la confiance n’exclut pas le contrôle ; en cas
+                                        d’une anomalie constatée ou pour toute autre information relative avec le
+                                        service, le membre est tenu à contacter le responsable avant 24 heures ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 5</span>
+                                    <p>Pour raison de sécurité pour tous, le recouvrement est fait à partir de 16
+                                        heures jusqu’à 18 heures sauf en cas d’un désagrément, mais aussi le membre
+                                        doit préparer son carnet et l’argent pour ne pas perdre le temps ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 6</span>
+                                    <p>Nous libérons l’argent après une semaine, chaque lundi et/ou mardi, c.-à-d.
+                                        le retrait est hebdomadaire ; c’est ainsi le membre doit patienter ces deux
+                                        jours car il n’y a pas une urgence urgente dit-on ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 7</span>
+                                    <p>Le retrait doit se faire pendant les heures de travail allant de 8h00 jusqu’à
+                                        16h00. Contrairement à ces heures, l’argent ne sera pas libéré ; outre, le
+                                        membre doit se munir de son carnet lors du retrait pour référence car
+                                        personne ne recevra ou retirera pas sans le carnet ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 8</span>
+                                    <p>Le mouvement ou le comment est fait le retrait se fait soit par tirage soit
+                                        par non tirage, cela dépend des circonstances et faisabilités. Si pas par
+                                        tirage, le retrait est conditionné par le comment le membre paie
+                                        (ponctualité) et la demande du membre ; le nouveau membre retire dans la
+                                        dernière semaine de la fin du cycle et surtout tout membre qui a mal terminé
+                                        le précédent cycle sera aussi comme un nouveau membre ; si le membre ne paie
+                                        pas normalement, il retirera le montant compatible avec là où est son
+                                        mouvement ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 9</span>
+                                    <p>Tout membre qui n’a pas bien terminé le cycle précédent doit laisser cette
+                                        somme sur son argent comme gage ; s’il termine sans faille, on lui remet son
+                                        argent. Sinon, cette somme servira pour terminer son cycle, et se fait comme
+                                        suit : 62-60, 124-120, 186-180, 248-240, 310-300, 372-360, 434-420, 620-6000
+                                        ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 10</span>
+                                    <p>Le membre qui échoue le projet ou son cycle doit patienter la fin de ce
+                                        dernier pour retirer et il paiera une amende, pour ne pas terminer le cycle,
+                                        de : 1 part à 2 parts = 5000 FC ; 3 aux 6 parts = 10000 FC ; 7 aux 10 parts
+                                        = 15000 FC ; 11 aux 20 parts = 20000 FC ; 21 aux 50 parts = 35000 FC ; 50
+                                        au-delà = 50000 FC. Nb : l’amende est payée si et seulement si le membre
+                                        dépasse 1 jour de fin de cycle ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 11</span>
+                                    <p>Il est interdit à tout membre de lancer la demande du retrait avant que le
+                                        cycle ne commence ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 12</span>
+                                    <p>Les membres actifs du présent cycle doivent poser leurs signatures sur la
+                                        liste pour approuver qu’ils aient pris connaissance de ce ROI et doivent
+                                        appliquer ce dernier ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 13</span>
+                                    <p>Le membre ne doit faire le dépôt sans signature de l’AR et surtout que ce
+                                        dernier ne doit pas prendre l’argent sans poser sa signature ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 14</span>
+                                    <p>Pour le retrait, tout membre doit annoncer une semaine avant pour bien
+                                        étudier son cas, car toute réponse dépendra du mouvement de dépôt de membre
+                                        et surtout des nombres de demandes… ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 15</span>
+                                    <p>Le cycle se termine à 9 semaines pour tout le monde ; si le membre n’a pas
+                                        terminé, soit il a une dette, ce dernier ne peut pas continuer à payer ce
+                                        présent cycle dans le suivant dans l’angle où il veut faire deux cycles en
+                                        un seul ; si tel est le cas, il paiera les frais de fonctionnement du
+                                        service qui est la somme recouvrée le tout premier jour du cycle ;
+                                        toutefois, il peut laisser son argent pour le retirer une fois pour toute
+                                        après un, deux ou plusieurs cycles et cela sans intérêt ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 16</span>
+                                    <p>L’agent recouvreur prendra chaque dimanche ou lundi les carnets de tous les
+                                        membres afin d’une évaluation hebdomadaire ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 17</span>
+                                    <p>À chaque début d’une phase ou cycle de la ristourne, chaque membre inscrit
+                                        doit approuver son enregistrement ou confirmer en signant à ce ROI ;</p>
+                                </div>
+                                <div class="roi-article-card">
+                                    <span class="article-num">Art. 18</span>
+                                    <p>Pour le social, tout membre devra payer hebdomadairement 500 FC afin
+                                        d’assister aux événements heureux et malheureux à nos membres.</p>
+                                </div>
+                            </div>
+
+                            <div class="roi-footer">
+                                <p>POUR LE DÉPARTEMENT</p>
+                                <strong>CHEF DU DÉPARTEMENT</strong>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
             </div>
 
-                <!-- Tab Admin & Sécurité -->
-                <div id="tab-admin-security" class="tab-pane fade-in">
-                    <div class="welcome-banner glass-panel" style="background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%); color: white;">
-                        <h2>🔒 Espace Administrateur et Sécurité</h2>
-                        <p>Gérez les accès, la sécurité et les paramètres globaux critiques de l'application.</p>
+            <!-- Tab Admin & Sécurité -->
+            <div id="tab-admin-security" class="tab-pane fade-in">
+                <div class="welcome-banner glass-panel"
+                    style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); margin-bottom: 30px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                    <div
+                        style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 16px; backdrop-filter: blur(10px);">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
                     </div>
+                    <div>
+                        <h2
+                            style="font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 2.2rem; margin: 0 0 10px 0; letter-spacing: -0.5px;">
+                            Espace Administrateur et Sécurité</h2>
+                        <p
+                            style="font-family: 'Inter', sans-serif; font-size: 1.1rem; opacity: 0.85; margin: 0; max-width: 600px;">
+                            Gérez les accès, la sécurité, les sauvegardes et les paramètres globaux critiques de
+                            l'application avec des outils professionnels.</p>
+                    </div>
+                </div>
 
-                    <div class="layout-grid two-cols" style="margin-top: 20px;">
-                        
+                <div class="layout-grid"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr)); gap: 30px;">
+
+                    <!-- SECTION: GESTION DES ACCÈS -->
+                    <div style="display: flex; flex-direction: column; gap: 30px;">
+
                         <!-- Panel Sécurité & Accès (Visibilité Admin) -->
-                        <div class="panel glass-panel" id="security-panel-admin">
-                            <h3 style="color: var(--primary-color);">🔑 Informations Administrateur Principal</h3>
-                            <p class="text-muted mb-20">Consultez et modifiez les identifiants de connexion de l'administrateur principal.</p>
-                            <form id="change-credentials-form">
-                                <div class="form-group" style="margin-bottom: 15px;">
-                                    <label for="change-email">Adresse Email Admin Actuelle</label>
-                                    <input type="email" id="change-email" required
-                                        placeholder="Ex: zubiksservice@gmail.com" class="large-input" style="background: #f8fafc;">
+                        <div class="panel glass-panel" id="security-panel-admin"
+                            style="padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05);">
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+                                <div
+                                    style="background: rgba(59, 130, 246, 0.1); padding: 12px; border-radius: 12px; color: #3b82f6;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="12" cy="7" r="4"></circle>
+                                    </svg>
                                 </div>
+                                <div>
+                                    <h3
+                                        style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; color: #1e293b; margin: 0;">
+                                        Identifiants Principaux</h3>
+                                    <p
+                                        style="font-family: 'Inter', sans-serif; font-size: 0.9rem; color: #64748b; margin: 4px 0 0 0;">
+                                        Modifiez l'accès de l'administrateur système.</p>
+                                </div>
+                            </div>
+
+                            <form id="change-credentials-form">
                                 <div class="form-group" style="margin-bottom: 20px;">
-                                    <label for="change-password">Nouveau mot de passe</label>
-                                    <input type="password" id="change-password" required placeholder="Nouveau mot de passe"
-                                        class="large-input">
+                                    <label for="change-email"
+                                        style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.95rem; color: #475569;">Adresse
+                                        Email Actuelle</label>
+                                    <input type="text" inputmode="email" id="change-email" required
+                                        placeholder="Ex: admin@zubiks.com" class="large-input"
+                                        style="font-family: 'Inter', sans-serif; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 1rem;">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 25px;">
+                                    <label for="change-password"
+                                        style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.95rem; color: #475569;">Nouveau
+                                        mot de passe</label>
+                                    <input type="password" id="change-password" required
+                                        placeholder="Saisissez un mot de passe fort" class="large-input"
+                                        style="font-family: 'Inter', sans-serif; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 1rem;">
                                 </div>
                                 <button type="submit" class="btn-primary w-100"
-                                    style="padding: 12px; font-size: 1rem;">Mettre à jour le mot de passe et l'email</button>
-                            </form>
-                        </div>
-
-                        <!-- Panel Admin Secondaire -->
-                        <div class="panel glass-panel" id="panel-admin-secondaire">
-                            <h3 style="color: #dd6b20;">👥 Nommer un Administrateur Secondaire</h3>
-                            <p class="text-muted mb-20">Créez un compte administrateur secondaire (qui n'apparaîtra pas dans la liste des membres).</p>
-                            <form id="create-secondary-admin-form">
-                                <div class="form-group" style="margin-bottom: 15px;">
-                                    <label for="sec-admin-name">Nom Complet</label>
-                                    <input type="text" id="sec-admin-name" required placeholder="Ex: Obed Heshima" class="large-input">
-                                </div>
-                                <div class="form-group" style="margin-bottom: 15px;">
-                                    <label for="sec-admin-email">Adresse Email</label>
-                                    <input type="email" id="sec-admin-email" required placeholder="obed.heshima@gmail.com" class="large-input">
-                                </div>
-                                <div class="form-group" style="margin-bottom: 20px;">
-                                    <label for="sec-admin-password">Mot de passe provisoire</label>
-                                    <input type="text" id="sec-admin-password" required placeholder="Mot de passe" class="large-input">
-                                </div>
-                                <button type="submit" class="btn-primary w-100" style="padding: 12px; font-size: 1rem; background: #dd6b20;">
-                                    Créer le compte Administrateur Secondaire
+                                    style="font-family: 'Outfit', sans-serif; font-weight: 600; padding: 14px; font-size: 1.05rem; border-radius: 10px; background: #3b82f6; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4); transition: all 0.2s;">
+                                    Mettre à jour les accès
                                 </button>
                             </form>
                         </div>
 
-                        <!-- Panel Sauvegarde & Restauration (Admin) -->
-                        <div class="panel glass-panel" id="backup-panel-admin" style="grid-column: 1 / -1;">
-                            <h3>Base de Données : Sauvegarde & Restauration</h3>
-                            <p class="text-muted mb-20">Gérez vos données dynamiques locales pour éviter toute perte en cas de changement d'appareil ou d'effacement de l'historique du navigateur.</p>
-
-                            <div class="archive-section mt-20" style="background: #f8fafc; padding: 20px; border-radius: var(--radius-sm); border: 1px solid #e2e8f0; margin-bottom: 20px;">
-                                <h4 style="margin-bottom: 10px;">💾 Exporter les données</h4>
-                                <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 15px;">Téléchargez une copie complète de la base de données actuelle (membres, transactions, historiques).</p>
-                                <button id="btn-export-db" class="btn-success w-100" style="padding: 12px; font-size: 1rem;">Exporter la Base de Données (.json)</button>
+                        <!-- Panel Admin Secondaire -->
+                        <div class="panel glass-panel" id="panel-admin-secondaire"
+                            style="padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05);">
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+                                <div
+                                    style="background: rgba(245, 158, 11, 0.1); padding: 12px; border-radius: 12px; color: #f59e0b;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3
+                                        style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; color: #1e293b; margin: 0;">
+                                        Administrateurs Secondaires</h3>
+                                    <p
+                                        style="font-family: 'Inter', sans-serif; font-size: 0.9rem; color: #64748b; margin: 4px 0 0 0;">
+                                        Déléguez des accès sécurisés.</p>
+                                </div>
                             </div>
 
-                            <div class="archive-section mt-20" style="background: #fff5f5; padding: 20px; border-radius: var(--radius-sm); border: 1px solid #fed7d7;">
-                                <h4 style="margin-bottom: 10px; color: var(--danger);">📂 Importer des données</h4>
-                                <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 15px;">Importez un fichier de sauvegarde précédemment exporté. <strong style="color: var(--danger);">Attention : Cela écrasera toutes vos données actuelles.</strong></p>
+                            <form id="create-secondary-admin-form">
+                                <div class="form-group" style="margin-bottom: 15px;">
+                                    <label for="sec-admin-name"
+                                        style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.95rem; color: #475569;">Nom
+                                        Complet</label>
+                                    <input type="text" id="sec-admin-name" required placeholder="Ex: Obed Heshima"
+                                        class="large-input"
+                                        style="font-family: 'Inter', sans-serif; padding: 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 1rem;">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 15px;">
+                                    <label for="sec-admin-email"
+                                        style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.95rem; color: #475569;">Adresse
+                                        Email</label>
+                                    <input type="email" id="sec-admin-email" required placeholder="obed@exemple.com"
+                                        class="large-input"
+                                        style="font-family: 'Inter', sans-serif; padding: 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 1rem;">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 20px;">
+                                    <label for="sec-admin-password"
+                                        style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.95rem; color: #475569;">Mot
+                                        de passe provisoire</label>
+                                    <input type="text" id="sec-admin-password" required
+                                        placeholder="Générer un mot de passe" class="large-input"
+                                        style="font-family: 'Inter', sans-serif; padding: 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 1rem;">
+                                </div>
+                                <button type="submit" class="btn-primary w-100"
+                                    style="font-family: 'Outfit', sans-serif; font-weight: 600; padding: 14px; font-size: 1.05rem; border-radius: 10px; background: #f59e0b; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4); border: none; transition: all 0.2s;">
+                                    Créer le compte secondaire
+                                </button>
+                            </form>
+
+                            <hr style="margin: 30px 0; border: 0; border-top: 1px solid #e2e8f0;">
+
+                            <h4
+                                style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; color: #1e293b; margin-bottom: 15px;">
+                                Liste des administrateurs actifs</h4>
+                            <div class="table-responsive"
+                                style="border-radius: 10px; border: 1px solid #e2e8f0; overflow: hidden;">
+                                <table class="data-table" style="margin: 0; width: 100%;">
+                                    <thead style="background: #f8fafc;">
+                                        <tr>
+                                            <th
+                                                style="font-family: 'Inter', sans-serif; font-weight: 600; color: #475569; padding: 12px 15px;">
+                                                Nom</th>
+                                            <th
+                                                style="font-family: 'Inter', sans-serif; font-weight: 600; color: #475569; padding: 12px 15px;">
+                                                Email</th>
+                                            <th
+                                                style="font-family: 'Inter', sans-serif; font-weight: 600; color: #475569; padding: 12px 15px; text-align: center;">
+                                                Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="secondary-admins-list-tbody">
+                                        <tr>
+                                            <td colspan="3" class="text-center text-muted"
+                                                style="padding: 20px; font-family: 'Inter', sans-serif;">Aucun
+                                                administrateur secondaire</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECTION: GESTION DES DONNÉES -->
+                    <div style="display: flex; flex-direction: column; gap: 30px;">
+
+                        <!-- Panel Sauvegarde & Restauration (Admin) -->
+                        <div class="panel glass-panel" id="backup-panel-admin"
+                            style="padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05);">
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+                                <div
+                                    style="background: rgba(16, 185, 129, 0.1); padding: 12px; border-radius: 12px; color: #10b981;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3
+                                        style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; color: #1e293b; margin: 0;">
+                                        Sauvegarde & Restauration</h3>
+                                    <p
+                                        style="font-family: 'Inter', sans-serif; font-size: 0.9rem; color: #64748b; margin: 4px 0 0 0;">
+                                        Gérez vos copies de sécurité locales.</p>
+                                </div>
+                            </div>
+
+                            <div class="archive-section"
+                                style="background: #f8fafc; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px; transition: transform 0.2s;">
+                                <h4
+                                    style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; color: #1e293b; margin: 0 0 8px 0;">
+                                    💾 Exporter les données</h4>
+                                <p
+                                    style="font-family: 'Inter', sans-serif; font-size: 0.95rem; color: #64748b; margin: 0 0 20px 0; line-height: 1.5;">
+                                    Téléchargez une copie complète au format JSON de toutes vos données actuelles
+                                    (membres, transactions, historiques).</p>
+                                <button id="btn-export-db" class="btn-success w-100"
+                                    style="font-family: 'Outfit', sans-serif; font-weight: 600; padding: 14px; font-size: 1.05rem; border-radius: 10px; background: #10b981; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4); border: none;">
+                                    Exporter la Base de Données (.json)
+                                </button>
+                            </div>
+
+                            <div class="archive-section"
+                                style="background: #fff1f2; padding: 25px; border-radius: 12px; border: 1px solid #ffe4e6; transition: transform 0.2s;">
+                                <h4
+                                    style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; color: #e11d48; margin: 0 0 8px 0;">
+                                    📂 Importer des données</h4>
+                                <p
+                                    style="font-family: 'Inter', sans-serif; font-size: 0.95rem; color: #881337; margin: 0 0 20px 0; line-height: 1.5;">
+                                    Importez un fichier de sauvegarde précédemment exporté. <br><strong
+                                        style="color: #e11d48; font-weight: 600;">Attention : Cela écrasera vos données
+                                        actuelles.</strong></p>
                                 <input type="file" id="import-file-input" accept=".json" style="display: none;">
-                                <button id="btn-import-db" class="btn-danger w-100" style="padding: 12px; font-size: 1rem;">Importer une Base de Données</button>
+                                <button id="btn-import-db" class="btn-danger w-100"
+                                    style="font-family: 'Outfit', sans-serif; font-weight: 600; padding: 14px; font-size: 1.05rem; border-radius: 10px; background: #e11d48; box-shadow: 0 4px 14px rgba(225, 29, 72, 0.4); border: none;">
+                                    Importer une Base de Données
+                                </button>
                             </div>
                         </div>
 
                         <!-- Panel Danger: Réinitialiser -->
-                        <div class="panel glass-panel" id="panel-reset-app" style="grid-column: 1 / -1; border-left: 4px solid var(--danger);">
-                            <h3 style="color: var(--danger);">⚠️ Zone de Danger : Réinitialiser l'application</h3>
-                            <p class="text-muted mb-20">Cette action est irréversible. Elle supprimera <strong>tous les membres, dépôts, retraits, et transactions</strong> de la base de données. L'application redeviendra vierge comme au premier jour.</p>
-                            
-                            <button id="reset-database-btn" class="btn-danger w-100" style="padding: 15px; font-size: 1.1rem; font-weight: bold; background-color: #c53030; color: white; display: flex; justify-content: center; align-items: center; gap: 10px;">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                                Réinitialiser toutes les données de l'application
+                        <div class="panel glass-panel" id="panel-reset-app"
+                            style="padding: 30px; border-radius: 16px; box-shadow: 0 20px 40px rgba(220, 38, 38, 0.1); border: 2px solid #fecaca; background: linear-gradient(to bottom, #ffffff, #fef2f2);">
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                                <div style="background: #fee2e2; padding: 12px; border-radius: 12px; color: #dc2626;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path
+                                            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                                        </path>
+                                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3
+                                        style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; color: #dc2626; margin: 0;">
+                                        Zone de Danger</h3>
+                                    <p
+                                        style="font-family: 'Inter', sans-serif; font-size: 0.9rem; color: #991b1b; margin: 4px 0 0 0;">
+                                        Réinitialisation complète de l'application.</p>
+                                </div>
+                            </div>
+
+                            <p
+                                style="font-family: 'Inter', sans-serif; font-size: 1rem; color: #7f1d1d; margin: 0 0 25px 0; line-height: 1.6; padding: 15px; background: rgba(254, 226, 226, 0.5); border-radius: 10px; border-left: 4px solid #ef4444;">
+                                <strong>Cette action est irréversible.</strong> Elle supprimera définitivement tous les
+                                membres, transactions et historiques de la base de données. L'application redeviendra
+                                vierge.
+                            </p>
+
+                            <button id="reset-database-btn" class="btn-danger w-100"
+                                style="font-family: 'Outfit', sans-serif; font-weight: 700; padding: 16px; font-size: 1.1rem; border-radius: 12px; background-color: #dc2626; color: white; display: flex; justify-content: center; align-items: center; gap: 12px; border: none; box-shadow: 0 8px 20px rgba(220, 38, 38, 0.3); transition: transform 0.2s, box-shadow 0.2s;">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                </svg>
+                                RÉINITIALISER TOUTES LES DONNÉES
                             </button>
                         </div>
 
                     </div>
                 </div>
-
             </div>
-        </main>
+
+    </div>
+    </main>
     </div>
 
     <!-- Modal Validation Opération -->
@@ -1280,48 +1608,34 @@
                 </div>
             </div>
             <div class="modal-footer" style="justify-content: center; gap: 10px;">
-                <button id="promote-admin-btn" class="btn-primary" style="background-color: var(--warning); display: none;">Promouvoir Admin</button>
+                <button id="promote-admin-btn" class="btn-primary"
+                    style="background-color: var(--warning); display: none;">Promouvoir Admin</button>
                 <button class="btn-secondary close-modal-btn">Fermer</button>
             </div>
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+    <!-- jsPDF pour l'export de tableau en PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-        // VEUILLEZ REMPLACER L'OBJET firebaseConfig PAR CELUI FOURNI PAR FIREBASE
-        const firebaseConfig = {
-            apiKey: "AIzaSyBFgly_84S8lsKFTJa7fWnaok_U7lan0Gk",
-            authDomain: "zubiks-service.firebaseapp.com",
-            projectId: "zubiks-service",
-            storageBucket: "zubiks-service.firebasestorage.app",
-            messagingSenderId: "31130954875",
-            appId: "1:31130954875:web:d67a7f2c4c602eebb1c6de",
-            measurementId: "G-R3H3VP91GG"
-        };
-
-        let app;
-        try {
-            app = initializeApp(firebaseConfig);
-            window.firebaseAuth = getAuth(app);
-            window.firebaseDb = getFirestore(app);
-            window.firebaseSignIn = signInWithEmailAndPassword;
-            window.firebaseSignUp = createUserWithEmailAndPassword;
-            window.firebaseSignOut = signOut;
-            window.firebaseResetPassword = sendPasswordResetEmail;
-            window.firebaseDoc = doc;
-            window.firebaseGetDoc = getDoc;
-            window.firebaseSetDoc = setDoc;
-            console.log("Firebase initialisé !");
-        } catch(e) {
-            console.error("Veuillez configurer Firebase correctement dans index.html !", e);
-        }
-    </script>
-    <script src="app.js"></script>
+    <script src="app.js?v=3"></script>
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
+    <!-- Service Worker Registration for PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+    </script>
 </body>
 
 </html>

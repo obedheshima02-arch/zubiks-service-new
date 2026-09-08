@@ -1,4 +1,18 @@
-node_modules/
-.env
+# Ignore OS generated files
 .DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Ignore IDE / Editor files
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Logs
 *.log
+
+# Temp / Local config
+tmp/
+temp/
