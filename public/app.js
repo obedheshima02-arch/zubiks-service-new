@@ -285,14 +285,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                if (!window.firebaseAuth) throw new Error("Firebase non initialisé");
-                await window.firebaseResetPassword(window.firebaseAuth, email);
-                showToast("Un e-mail de réinitialisation a été envoyé si le compte existe.", "success");
+                const res = await fetch(`${API.auth}?action=reset_password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Impossible de réinitialiser le mot de passe.");
+
+                showToast(data.message || "Un e-mail de réinitialisation a été envoyé.", "success");
                 forgotPasswordForm.reset();
                 if (btnShowLogin) btnShowLogin.click();
             } catch (err) {
-                console.error("Erreur forgot-password Firebase :", err);
-                showToast("Impossible d'envoyer l'e-mail de réinitialisation.", "error");
+                console.error("Erreur forgot-password :", err);
+                showToast(err.message || "Impossible d'envoyer l'e-mail de réinitialisation.", "error");
             }
         });
     }
@@ -468,15 +474,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (currentUser) {
                     try {
                         if (currentUser.role === 'admin' || currentUser.role === 'admin_second') {
-                            const newCredentials = { ...state.credentials, profilePhoto: base64String };
-                            await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "global", "stats"), {
-                                credentials: newCredentials
+                            await fetch(`${API.stats}?action=update_admin_photo`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ profilePhoto: base64String })
                             });
-                            state.credentials = newCredentials;
                             currentUser.profilePhoto = base64String;
                         } else {
-                            await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(currentUser.id)), {
-                                profilePhoto: base64String
+                            await fetch(`${API.members}?action=update_photo`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: currentUser.id, profilePhoto: base64String })
                             });
                             const userIndex = state.members.findIndex(m => String(m.id) === String(currentUser.id));
                             if (userIndex !== -1) state.members[userIndex].profilePhoto = base64String;
@@ -558,12 +566,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const performLogout = async (msg = 'Vous êtes déconnecté.') => {
         try {
-            if (window.firebaseAuth) {
-                await window.firebaseSignOut(window.firebaseAuth);
-            }
-        } catch (error) {
-            console.error("Erreur lors de la déconnexion Firebase:", error);
-        }
+            await fetch(`${API.auth}?action=logout`, { method: 'POST' });
+        } catch (error) { }
 
         currentUser = null;
         localStorage.removeItem('zubiks_jwt_token');
@@ -672,14 +676,22 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentUser && currentUser.role !== 'admin') {
                 if (targetId === 'tab-messagerie-user' && state.messages) {
                     let updatedMsgs = false;
-                    state.messages.forEach(async m => {
+                    state.messages.forEach(m => {
                         if (String(m.memberId) === String(currentUser.id) && !m.readByUser && m.sender === 'admin') {
                             m.readByUser = true;
                             updatedMsgs = true;
-                            try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "messages", String(m.id)), { readByUser: true }); } catch (e) { }
                         }
                     });
-                    if (updatedMsgs) renderAll();
+                    if (updatedMsgs) {
+                        renderAll();
+                        try {
+                            fetch(`${API.messages}?action=mark_read`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ memberId: currentUser.id, readBy: 'user' })
+                            });
+                        } catch (e) { }
+                    }
                 } else if (targetId === 'tab-user-notifications' && currentUser.notifications) {
                     let updatedNotifs = false;
                     const newNotifs = currentUser.notifications.map(n => {
@@ -692,7 +704,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (updatedNotifs) {
                         currentUser.notifications = newNotifs;
                         renderAll();
-                        try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(currentUser.id)), { notifications: newNotifs }); } catch (e) { }
+                        try {
+                            fetch(`${API.members}?action=update_notifs`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: currentUser.id, notifications: newNotifs })
+                            });
+                        } catch (e) { }
                     }
                 }
             }
@@ -1337,12 +1355,22 @@ document.addEventListener('DOMContentLoaded', () => {
             // Mark received admin messages as read when user views messaging tab
             const activeTab = document.querySelector('.tab-pane.active');
             if (activeTab && activeTab.id === 'tab-messagerie-user') {
-                userMsgs.forEach(async m => {
+                let markUpdated = false;
+                userMsgs.forEach(m => {
                     if (m.sender === 'admin' && !m.readByUser) {
                         m.readByUser = true;
-                        try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "messages", String(m.id)), { readByUser: true }); } catch (e) { }
+                        markUpdated = true;
                     }
                 });
+                if (markUpdated) {
+                    try {
+                        fetch(`${API.messages}?action=mark_read`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ memberId: currentUser.id, readBy: 'user' })
+                        });
+                    } catch (e) { }
+                }
             }
 
             const unreadUserCount = userMsgs.filter(m => m.sender === 'admin' && !m.readByUser).length;
@@ -1453,14 +1481,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         item.onclick = () => {
                             selectedAdminChatMemberId = m.id;
-                            // Mark user messages as read by admin for this member
                             let markUpdated = false;
-                            mMsgs.forEach(async msg => {
+                            mMsgs.forEach(msg => {
                                 if (msg.sender === 'user' && !msg.readByAdmin) {
                                     msg.readByAdmin = true;
-                                    try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "messages", String(msg.id)), { readByAdmin: true }); } catch (e) { }
+                                    markUpdated = true;
                                 }
                             });
+                            if (markUpdated) {
+                                try {
+                                    fetch(`${API.messages}?action=mark_read`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ memberId: m.id, readBy: 'admin' })
+                                    });
+                                } catch (e) { }
+                            }
                             const chatGrid = document.querySelector('.admin-chat-grid');
                             if (chatGrid) chatGrid.classList.add('mobile-chat-open');
 
@@ -1523,12 +1559,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         adminChatMessages.innerHTML = '<div class="text-center text-muted" style="margin-top: 60px;">Écrivez ci-dessous pour envoyer un message à ce membre.</div>';
                     }
                 }
-            } else {
-                if (chatHeaderName) chatHeaderName.textContent = 'Sélectionnez un membre';
-                if (chatHeaderInfo) chatHeaderInfo.textContent = 'Cliquez sur un membre à gauche pour lire et répondre.';
-                if (chatInput) { chatInput.disabled = true; chatInput.value = ''; }
-                if (chatSendBtn) chatSendBtn.disabled = true;
-                if (adminChatMessages) adminChatMessages.innerHTML = '<div class="text-center text-muted" style="margin-top: 60px;">👈 Sélectionnez une conversation dans la liste de gauche pour afficher les messages.</div>';
             }
         }
     };
@@ -1542,21 +1572,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const text = input ? input.value.trim() : '';
 
             if (text && currentUser && currentUser.role !== 'admin') {
-                if (!state.messages) state.messages = [];
-                const newMsg = {
-                    id: Date.now().toString(),
-                    memberId: currentUser.id,
-                    sender: 'user',
-                    senderName: currentUser.nom,
-                    text: text,
-                    timestamp: new Date().toISOString(),
-                    readByAdmin: false,
-                    readByUser: true
-                };
-                state.messages.push(newMsg);
-                try { await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "messages", String(newMsg.id)), newMsg); } catch (e) { }
-                renderAll();
-                if (input) input.value = '';
+                try {
+                    const res = await fetch(`${API.messages}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            memberId: currentUser.id,
+                            sender: 'user',
+                            senderName: currentUser.nom,
+                            text: text
+                        })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || "Erreur d'envoi");
+
+                    await loadState();
+                    if (input) input.value = '';
+                } catch (err) {
+                    showToast(err.message || "Erreur lors de l'envoi du message.", "error");
+                }
             }
         });
     }
@@ -1569,40 +1603,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const text = input ? input.value.trim() : '';
 
             if (text && selectedAdminChatMemberId) {
-                if (!state.messages) state.messages = [];
-                const newMsg = {
-                    id: Date.now().toString(),
-                    memberId: selectedAdminChatMemberId,
-                    sender: 'admin',
-                    senderName: 'Admin ZUBIKS',
-                    text: text,
-                    timestamp: new Date().toISOString(),
-                    readByAdmin: true,
-                    readByUser: false
-                };
-                state.messages.push(newMsg);
-
-                // Add notification to member account
-                const targetMember = state.members.find(m => String(m.id) === String(selectedAdminChatMemberId));
-                if (targetMember) {
-                    if (!targetMember.notifications) targetMember.notifications = [];
-                    targetMember.notifications.push({
-                        id: Date.now().toString(),
-                        message: `💬 Nouveau message de l'administrateur : "${text.length > 50 ? text.substring(0, 50) + '...' : text}"`,
-                        date: new Date().toISOString(),
-                        read: false
-                    });
-                }
-
                 try {
-                    await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "messages", String(newMsg.id)), newMsg);
-                    if (targetMember) {
-                        await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(targetMember.id)), { notifications: targetMember.notifications });
-                    }
-                } catch (e) { }
+                    const res = await fetch(`${API.messages}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            memberId: selectedAdminChatMemberId,
+                            sender: 'admin',
+                            senderName: (currentUser ? currentUser.nom : 'Admin ZUBIKS'),
+                            text: text
+                        })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || "Erreur d'envoi");
 
-                renderAll();
-                if (input) { input.value = ''; input.style.height = 'auto'; }
+                    await loadState();
+                    if (input) { input.value = ''; input.style.height = 'auto'; }
+                } catch (err) {
+                    showToast(err.message || "Erreur lors de l'envoi du message.", "error");
+                }
             }
         });
     }
@@ -1619,48 +1638,26 @@ document.addEventListener('DOMContentLoaded', () => {
                         showToast("Aucun membre actif à qui envoyer l'annonce.", "error");
                         return;
                     }
-                    if (!state.messages) state.messages = [];
-                    let count = 0;
-                    const timestamp = new Date().toISOString();
                     const text = `📢 ANNONCE GÉNÉRALE: ${annonce.trim()}`;
+                    let count = 0;
 
                     for (const member of activeMembersList) {
-                        // Create chat message
-                        const newMsg = {
-                            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                            memberId: member.id,
-                            sender: 'admin',
-                            senderName: 'Administration',
-                            text: text,
-                            timestamp: timestamp,
-                            readByAdmin: true,
-                            readByUser: false
-                        };
-                        state.messages.push(newMsg);
-
                         try {
-                            await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "messages", String(newMsg.id)), newMsg);
-                        } catch (e) { }
-
-                        // Add notification
-                        if (!member.notifications) member.notifications = [];
-                        member.notifications.push({
-                            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                            message: `📢 Nouvelle annonce : "${annonce.length > 50 ? annonce.substring(0, 50) + '...' : annonce}"`,
-                            date: timestamp,
-                            read: false
-                        });
-
-                        try {
-                            await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(member.id)), {
-                                notifications: member.notifications
+                            await fetch(`${API.messages}`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    memberId: member.id,
+                                    sender: 'admin',
+                                    senderName: 'Administration',
+                                    text: text
+                                })
                             });
+                            count++;
                         } catch (e) { }
-
-                        count++;
                     }
+                    await loadState();
                     showToast(`Annonce envoyée avec succès à ${count} membre(s) !`, "success");
-                    renderAll();
                 }
             }
         });
@@ -1920,7 +1917,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         promoteBtn.onclick = async () => {
                             if (confirm(`Voulez-vous retirer les droits d'administrateur à ${member.nom} ?`)) {
                                 member.role = 'user';
-                                try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(member.id)), { role: 'user' }); } catch (e) { }
+                                try {
+                                    await fetch(`${API.members}?action=update_role`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ id: member.id, role: 'user' })
+                                    });
+                                } catch (e) { }
                                 showToast(`${member.nom} n'est plus administrateur.`, 'success');
                                 memberDetailsModal.classList.remove('active');
                                 renderAll();
@@ -1937,7 +1940,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                             if (confirm(`Voulez-vous promouvoir ${member.nom} comme Administrateur Secondaire ?\n\nIl aura accès au tableau de bord, mais sans les droits de sécurité.`)) {
                                 member.role = 'admin_second';
-                                try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(member.id)), { role: 'admin_second' }); } catch (e) { }
+                                try {
+                                    await fetch(`${API.members}?action=update_role`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ id: member.id, role: 'admin_second' })
+                                    });
+                                } catch (e) { }
                                 showToast(`${member.nom} est maintenant administrateur secondaire !`, 'success');
                                 memberDetailsModal.classList.remove('active');
                                 renderAll();
@@ -2000,89 +2009,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         }
 
-                        showToast("Synchronisation avec le Cloud en cours... Veuillez patienter.", "info");
-
-                        if (!isMerge) {
-                            // 1. Clear existing collections for replace
-                            const collectionsToClear = ["members", "transactions", "messages", "archives", "daily_archives", "deleted_members"];
-                            for (const collName of collectionsToClear) {
-                                try {
-                                    const snapshot = await window.firebaseGetDocs(window.firebaseCollection(window.firebaseDb, collName));
-                                    for (const d of snapshot.docs) {
-                                        if (collName === "members") {
-                                            const data = d.data();
-                                            if (data.role === 'admin' || data.role === 'admin_second') {
-                                                continue; // Keep admins
-                                            }
-                                        }
-                                        await window.firebaseDeleteDoc(d.ref);
-                                    }
-                                } catch (e) { }
-                            }
-                        }
-
-                        // 2. Upload Members
-                        for (const m of (importedState.members || [])) {
-                            try {
-                                if (isMerge) {
-                                    const existingSnap = await window.firebaseGetDoc(window.firebaseDoc(window.firebaseDb, "members", String(m.id)));
-                                    if (existingSnap.exists()) {
-                                        const existData = existingSnap.data();
-                                        await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(m.id)), {
-                                            totalDepot: (existData.totalDepot || 0) + (m.totalDepot || 0),
-                                            totalRetrait: (existData.totalRetrait || 0) + (m.totalRetrait || 0)
-                                        });
-                                    } else {
-                                        await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "members", String(m.id)), m);
-                                    }
-                                } else {
-                                    await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "members", String(m.id)), m);
-                                }
-                            } catch (e) { }
-                        }
-
-                        // 3. Upload other arrays
-                        const arraysToUpload = [
-                            { data: importedState.transactions, coll: "transactions" },
-                            { data: importedState.messages, coll: "messages" },
-                            { data: importedState.archives, coll: "archives" },
-                            { data: importedState.dailyArchives, coll: "daily_archives" },
-                            { data: importedState.deletedMembers, coll: "deleted_members" }
-                        ];
-
-                        for (const item of arraysToUpload) {
-                            for (const doc of (item.data || [])) {
-                                try {
-                                    const docId = doc.id || Date.now().toString() + Math.random().toString(36).substr(2, 5);
-                                    await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, item.coll, String(docId)), doc);
-                                } catch (e) { }
-                            }
-                        }
-
-                        // 4. Global Stats
-                        try {
-                            if (isMerge) {
-                                await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "global", "stats"), {
-                                    dailyDepots: window.firebaseIncrement(importedState.dailyDepots || 0),
-                                    dailyRetraits: window.firebaseIncrement(importedState.dailyRetraits || 0),
-                                    cycleDepots: window.firebaseIncrement(importedState.cycleDepots || 0),
-                                    cycleRetraits: window.firebaseIncrement(importedState.cycleRetraits || 0)
-                                });
-                            } else {
-                                await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "global", "stats"), {
-                                    dailyDepots: importedState.dailyDepots || 0,
-                                    dailyRetraits: importedState.dailyRetraits || 0,
-                                    cycleDepots: importedState.cycleDepots || 0,
-                                    cycleRetraits: importedState.cycleRetraits || 0,
-                                    argentDebut: importedState.argentDebut || 0,
-                                    reglements: importedState.reglements || state.reglements || ""
-                                }, { merge: true });
-                            }
-                        } catch (e) { }
-
-                        showToast(isMerge ? 'Données fusionnées avec le Cloud avec succès.' : 'Base de données remplacée avec succès sur le Cloud.', 'success');
-
-                        // Force full reload from Firestore
+                        showToast("Restauration de la sauvegarde terminée !", "success");
+                        await loadState();
                         setTimeout(() => window.location.reload(), 1500);
                     };
 
@@ -2108,34 +2036,20 @@ document.addEventListener('DOMContentLoaded', () => {
         archiveDailyBtn.addEventListener('click', async () => {
             if (confirm('Voulez-vous vraiment archiver la journée ? Cela remettra à zéro les compteurs journaliers.')) {
                 try {
-                    const { firebaseDb, firebaseDoc, firebaseCollection, firebaseWriteBatch } = window;
-                    const batch = firebaseWriteBatch(firebaseDb);
+                    const res = await fetch(`${API.stats}?action=archive_day`, { method: 'POST' });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || "Erreur lors de l'archivage.");
 
-                    // 1. Ajouter à daily_archives
-                    const archiveRef = firebaseDoc(firebaseCollection(firebaseDb, "daily_archives"));
-                    batch.set(archiveRef, {
-                        id: archiveRef.id,
-                        date: new Date().toISOString(),
-                        dailyDepots: state.dailyDepots || 0,
-                        dailyRetraits: state.dailyRetraits || 0
-                    });
-
-                    // 2. Réinitialiser les compteurs journaliers dans global/stats
-                    const statsRef = firebaseDoc(firebaseDb, "global", "stats");
-                    batch.set(statsRef, {
-                        dailyDepots: 0,
-                        dailyRetraits: 0
-                    }, { merge: true });
-
-                    await batch.commit();
+                    await loadState();
                     showToast('Journée archivée avec succès.', 'success');
                 } catch (error) {
                     console.error("Erreur lors de l'archivage journalier:", error);
-                    showToast('Erreur lors de l\'archivage.', 'error');
+                    showToast(error.message || 'Erreur lors de l\'archivage.', 'error');
                 }
             }
         });
     }
+
     if (archiveBtn) {
         archiveBtn.addEventListener('click', async () => {
             const confirmArchive = confirm('ARCHIVAGE : Cette action va sauvegarder le cycle actuel et réinitialiser les compteurs.\n\nVoulez-vous continuer ?');
@@ -2148,57 +2062,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 showToast("Archivage en cours, veuillez patienter...", "info");
-                const { firebaseDb, firebaseDoc, firebaseCollection, firebaseWriteBatch, firebaseGetDocs } = window;
+                const res = await fetch(`${API.stats}?action=archive_cycle`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Erreur lors de l'archivage du cycle.");
 
-                // On utilise plusieurs batchs si besoin (Firebase limite à 500 opérations par batch)
-                // Pour simplifier et assurer la fiabilité, on fait les suppressions séquentiellement
-
-                // 1. Sauvegarder l'archive
-                const cycleSolde = (state.cycleDepots || 0) - (state.cycleRetraits || 0);
-                const newArchive = {
-                    date: new Date().toISOString(),
-                    cycleDepots: state.cycleDepots || 0,
-                    cycleRetraits: state.cycleRetraits || 0,
-                    solde: cycleSolde,
-                    membersSnapshot: JSON.parse(JSON.stringify(state.members || [])),
-                    transactionsSnapshot: JSON.parse(JSON.stringify(state.transactions || []))
-                };
-
-                const archiveRef = firebaseDoc(firebaseCollection(firebaseDb, "archives"));
-                await window.firebaseSetDoc(archiveRef, newArchive);
-
-                // 2. Vider les collections (Membres, Transactions, Messages, DailyArchives)
-                const collectionsToClear = ["members", "transactions", "messages", "daily_archives"];
-
-                for (const collName of collectionsToClear) {
-                    const snap = await firebaseGetDocs(firebaseCollection(firebaseDb, collName));
-                    const deleteBatch = firebaseWriteBatch(firebaseDb);
-                    let count = 0;
-                    snap.forEach(docSnap => {
-                        deleteBatch.delete(docSnap.ref);
-                        count++;
-                    });
-                    if (count > 0) {
-                        await deleteBatch.commit(); // Note: if > 500 docs, this would fail. We assume < 500 for a single cycle in this MVP.
-                    }
-                }
-
-                // 3. Réinitialiser les stats globales
-                const statsRef = firebaseDoc(firebaseDb, "global", "stats");
-                await window.firebaseSetDoc(statsRef, {
-                    dailyDepots: 0,
-                    dailyRetraits: 0,
-                    cycleDepots: 0,
-                    cycleRetraits: 0,
-                    argentDebut: 0,
-                    reglements: state.reglements || "", // conserver les règlements
-                    credentials: state.credentials // conserver les identifiants
-                });
-
-                showToast('Nouveau cycle démarré avec 0 membre. Les utilisateurs peuvent à présent créer de nouveau leur compte.', 'success');
+                await loadState();
+                showToast('Nouveau cycle démarré avec succès. Historique sauvegardé !', 'success');
             } catch (error) {
                 console.error("Erreur lors de la réinitialisation du cycle:", error);
-                showToast("Erreur critique lors de l'archivage.", "error");
+                showToast(error.message || "Erreur lors de l'archivage.", "error");
             }
         });
     }
@@ -2210,149 +2082,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const doubleConfirm = confirm("⚠️ ATTENTION : Êtes-vous sûr de vouloir réinitialiser COMPLÈTEMENT toutes les données ?\n\nCette action supprimera définitivement tous les membres, les transactions et tous les historiques d'archives.");
 
             if (doubleConfirm) {
-                const passwordConfirm = prompt("Sécurité : Veuillez entrer le mot de passe administrateur pour confirmer la réinitialisation :");
-                if (!passwordConfirm) return;
-
                 try {
-                    await window.firebaseSignIn(window.firebaseAuth, currentUser.email, passwordConfirm);
-
                     showToast("Suppression des données en cours, veuillez patienter...", "info");
+                    const res = await fetch(`${API.stats}?action=reset_app`, { method: 'POST' });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || "Erreur lors de la réinitialisation.");
 
-                    // 1. Delete all collections
-                    const collectionsToClear = ["members", "transactions", "messages", "archives", "daily_archives", "deleted_members"];
-                    for (const collName of collectionsToClear) {
-                        try {
-                            const snapshot = await window.firebaseGetDocs(window.firebaseCollection(window.firebaseDb, collName));
-                            for (const d of snapshot.docs) {
-                                if (collName === "members") {
-                                    const data = d.data();
-                                    if (data.role === 'admin' || data.role === 'admin_second') {
-                                        continue; // Keep admins
-                                    }
-                                }
-                                await window.firebaseDeleteDoc(d.ref);
-                            }
-                        } catch (e) {
-                            console.error("Erreur clear " + collName, e);
-                        }
-                    }
-
-                    // 2. Reset global stats
-                    const currentReglements = state.reglements || "";
-                    try {
-                        await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "global", "stats"), {
-                            dailyDepots: 0,
-                            dailyRetraits: 0,
-                            cycleDepots: 0,
-                            cycleRetraits: 0,
-                            argentDebut: 0,
-                            reglements: currentReglements,
-                            credentials: state.credentials || { email: 'zubiksservice@gmail.com' }
-                        });
-                    } catch (e) { 
-                        console.error("Erreur lors de la réinitialisation des stats globales :", e);
-                    }
-
-                    // 3. Update local state (preserve admins)
-                    state.members = state.members.filter(m => m.role === 'admin' || m.role === 'admin_second');
-                    state.transactions = [];
-                    state.messages = [];
-                    state.archives = [];
-                    state.dailyArchives = [];
-                    state.deletedMembers = [];
-                    state.dailyDepots = 0;
-                    state.dailyRetraits = 0;
-                    state.cycleDepots = 0;
-                    state.cycleRetraits = 0;
-                    state.argentDebut = 0;
-                    state.reglements = currentReglements;
-
-                    renderAll();
+                    await loadState();
                     showToast("Toutes les données ont été réinitialisées avec succès.", "success");
-
-                    // Force refresh rules text area value
-                    const textarea = document.querySelector('.modern-textarea');
-                    if (textarea) textarea.value = currentReglements;
-
-                    // Populate change credentials email
-                    const changeEmailInput = document.getElementById('change-email');
-                    if (changeEmailInput) {
-                        changeEmailInput.value = (state.credentials && state.credentials.email) ? state.credentials.email : 'zubiksservice@gmail.com';
-                    }
                 } catch (err) {
-                    console.error("Mot de passe incorrect pour réinitialisation :", err);
-                    showToast("Mot de passe incorrect.", "error");
-                }
-            }
-        });
-    }
-
-    // --- Change Credentials ---
-    const changeCredentialsForm = document.getElementById('change-credentials-form');
-    if (changeCredentialsForm) {
-        changeCredentialsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const newEmail = document.getElementById('change-email').value.trim();
-            const newPassword = document.getElementById('change-password').value;
-
-            if (!newEmail || !newPassword) {
-                showToast("Veuillez remplir tous les champs.", "error");
-                return;
-            }
-
-            try {
-                if (!window.firebaseAuth || !window.firebaseAuth.currentUser) {
-                    showToast("Vous devez être connecté pour modifier vos identifiants.", "error");
-                    return;
-                }
-
-                const user = window.firebaseAuth.currentUser;
-
-                // 1. Mettre à jour l'email si modifié
-                if (user.email !== newEmail) {
-                    const lowerNewEmail = newEmail.toLowerCase();
-                    const existingMember = state.members.find(m => (m.email || '').toLowerCase() === lowerNewEmail);
-                    if (existingMember) {
-                        showToast("Cette adresse email est déjà utilisée par un autre membre.", "error");
-                        return;
-                    }
-                    await window.firebaseUpdateEmail(user, newEmail);
-                }
-
-                // 2. Mettre à jour le mot de passe
-                if (newPassword && newPassword.length >= 6) {
-                    await window.firebaseUpdatePassword(user, newPassword);
-                } else {
-                    showToast("Le mot de passe doit contenir au moins 6 caractères.", "warning");
-                    return;
-                }
-
-                // 3. Mettre à jour dans Firestore 'global/stats' (seulement l'email)
-                if (!state.credentials) state.credentials = {};
-                state.credentials.email = newEmail;
-
-                if (window.firebaseDb && window.firebaseDoc && window.firebaseUpdateDoc) {
-                    try {
-                        await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "global", "stats"), {
-                            'credentials.email': newEmail
-                        });
-                    } catch (e) { }
-                }
-
-                if (currentUser && currentUser.role === 'admin') {
-                    currentUser.email = newEmail;
-                    saveActiveSession(currentUser);
-                }
-
-                showToast("Identifiants mis à jour avec succès !", "success");
-                document.getElementById('change-password').value = '';
-
-            } catch (err) {
-                console.error("Erreur mise à jour credentials:", err);
-                if (err.code === 'auth/requires-recent-login') {
-                    showToast("Sécurité : Veuillez vous déconnecter et vous reconnecter avant de changer vos identifiants.", "error");
-                } else {
-                    showToast("Erreur de mise à jour Firebase.", "error");
+                    console.error("Erreur réinitialisation :", err);
+                    showToast(err.message || "Erreur de réinitialisation.", "error");
                 }
             }
         });
@@ -2363,8 +2103,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (textarea) {
         textarea.value = state.reglements || "";
         textarea.addEventListener('change', async (e) => {
-            state.reglements = e.target.value;
-            try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "global", "stats"), { reglements: state.reglements }); } catch (err) { }
+            const newReglements = e.target.value;
+            state.reglements = newReglements;
+            try {
+                await fetch(`${API.stats}?action=update_reglements`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reglements: newReglements })
+                });
+            } catch (err) { }
         });
     }
 
@@ -2374,7 +2121,13 @@ document.addEventListener('DOMContentLoaded', () => {
         btnMarkAllRead.addEventListener('click', async () => {
             if (currentUser && currentUser.role !== 'admin' && currentUser.notifications) {
                 currentUser.notifications.forEach(n => n.read = true);
-                try { await window.firebaseUpdateDoc(window.firebaseDoc(window.firebaseDb, "members", String(currentUser.id)), { notifications: currentUser.notifications }); } catch (e) { }
+                try {
+                    await fetch(`${API.members}?action=update_notifs`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: currentUser.id, notifications: currentUser.notifications })
+                    });
+                } catch (e) { }
                 renderAll();
                 showToast("Toutes vos notifications ont été marquées comme lues.", "success");
             }
@@ -2477,38 +2230,35 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                if (window.firebaseAuth && window.firebaseSignUp) {
-                    await window.firebaseSignUp(window.firebaseAuth, email, password);
+                const res = await fetch(`${API.auth}?action=signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, nom, parts: 1 })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Erreur lors de la création.");
+
+                if (data.user && data.user.id) {
+                    await fetch(`${API.members}?action=update_role`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: data.user.id, role: 'admin_second' })
+                    });
                 }
+
+                await loadState();
+                createSecAdminForm.reset();
+                showToast("Administrateur secondaire créé avec succès.", "success");
             } catch (err) {
-                console.error("Erreur Firebase Auth pour Admin Secondaire:", err);
-                if (err.code !== 'auth/email-already-in-use') {
-                    showToast("Erreur lors de la création du compte (Auth).", "error");
-                    return;
-                }
+                console.error("Erreur création admin secondaire :", err);
+                showToast(err.message || "Erreur lors de la création.", "error");
             }
-
-            const newAdmin = {
-                id: 'admin_' + Date.now(),
-                nom: nom,
-                email: email,
-                role: 'admin_second',
-                status: 'active',
-                dateAjout: new Date().toISOString()
-            };
-
-            state.members.push(newAdmin);
-            try { await window.firebaseSetDoc(window.firebaseDoc(window.firebaseDb, "members", String(newAdmin.id)), newAdmin); } catch (e) { }
-            renderAll();
-            createSecAdminForm.reset();
-            showToast("Administrateur secondaire créé avec succès.", "success");
         });
     }
 
-
     // Initialize
     const initializeAppUi = () => {
-        // Fonctions d'initialisation de l'interface (boutons supprimés)
+        // Fonctions d'initialisation de l'interface
     };
 
     let initDone = false;
@@ -2519,29 +2269,5 @@ document.addEventListener('DOMContentLoaded', () => {
         initializeAppUi();
     };
 
-    if (window.firebaseOnAuthStateChanged) {
-        let isFirstLoad = true;
-        window.firebaseOnAuthStateChanged(window.firebaseAuth, (user) => {
-            if (user) {
-                loadState().then(() => {
-                    if (isFirstLoad) { isFirstLoad = false; finishInit(); }
-                }).catch(() => {
-                    if (isFirstLoad) { isFirstLoad = false; finishInit(); }
-                });
-            } else {
-                if (isFirstLoad) { isFirstLoad = false; finishInit(); }
-            }
-        });
-        
-        // Timeout de sécurité au cas où Firebase Auth ne répond pas
-        setTimeout(() => {
-            if (isFirstLoad) {
-                console.warn("Firebase Auth timeout, fallback local...");
-                isFirstLoad = false;
-                finishInit();
-            }
-        }, 3000);
-    } else {
-        loadState().then(finishInit).catch(finishInit);
-    }
+    loadState().then(finishInit).catch(finishInit);
 });

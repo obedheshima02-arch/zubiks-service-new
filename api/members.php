@@ -90,6 +90,30 @@ if ($method === 'POST') {
 
         sendJson(['message' => 'Membre validé avec succès.']);
     }
+
+    if ($action === 'update_role') {
+        $id = $input['id'] ?? '';
+        $role = $input['role'] ?? 'user';
+        $stmt = $pdo->prepare("UPDATE members SET role = ? WHERE id = ?");
+        $stmt->execute([$role, $id]);
+        sendJson(['message' => 'Rôle du membre mis à jour.']);
+    }
+
+    if ($action === 'update_photo') {
+        $id = $input['id'] ?? '';
+        $profilePhoto = $input['profilePhoto'] ?? '';
+        $stmt = $pdo->prepare("UPDATE members SET profilePhoto = ? WHERE id = ?");
+        $stmt->execute([$profilePhoto, $id]);
+        sendJson(['message' => 'Photo de profil mise à jour.']);
+    }
+
+    if ($action === 'update_notifs') {
+        $id = $input['id'] ?? '';
+        $notifications = json_encode($input['notifications'] ?? []);
+        $stmt = $pdo->prepare("UPDATE members SET notifications = ? WHERE id = ?");
+        $stmt->execute([$notifications, $id]);
+        sendJson(['message' => 'Notifications mises à jour.']);
+    }
 }
 
 // PUT / POST update: Modifier les informations d'un membre

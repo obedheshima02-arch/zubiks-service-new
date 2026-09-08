@@ -20,8 +20,27 @@ if ($method === 'GET') {
     sendJson($msgs);
 }
 
-// POST: Envoyer un message
+// POST: Envoyer un message ou marquer comme lu
 if ($method === 'POST') {
+    $action = $_GET['action'] ?? '';
+
+    if ($action === 'mark_read') {
+        $memberId = $input['memberId'] ?? '';
+        $readBy = $input['readBy'] ?? '';
+
+        if ($readBy === 'user' && !empty($memberId)) {
+            $stmt = $pdo->prepare("UPDATE messages SET readByUser = 1 WHERE memberId = ? AND sender = 'admin'");
+            $stmt->execute([$memberId]);
+            sendJson(['message' => 'Messages marqués comme lus par l\'utilisateur.']);
+        } elseif ($readBy === 'admin' && !empty($memberId)) {
+            $stmt = $pdo->prepare("UPDATE messages SET readByAdmin = 1 WHERE memberId = ? AND sender = 'user'");
+            $stmt->execute([$memberId]);
+            sendJson(['message' => 'Messages marqués comme lus par l\'administrateur.']);
+        } else {
+            sendJson(['error' => 'Paramètres invalides.'], 400);
+        }
+    }
+
     $memberId = $input['memberId'] ?? '';
     $sender = $input['sender'] ?? 'user';
     $senderName = $input['senderName'] ?? '';

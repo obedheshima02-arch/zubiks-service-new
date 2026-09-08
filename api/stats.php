@@ -84,6 +84,7 @@ if ($method === 'POST') {
             $stmtA->execute([$id, $now, $cycleDepots, $cycleRetraits, $solde]);
 
             $stmtR = $pdo->query("UPDATE global_stats SET cycleDepots = 0, cycleRetraits = 0, dailyDepots = 0, dailyRetraits = 0 WHERE id = 1");
+            $pdo->query("UPDATE members SET totalDepot = 0, totalRetrait = 0");
             $pdo->commit();
 
             sendJson(['message' => 'Cycle archivé avec succès.']);
@@ -91,6 +92,13 @@ if ($method === 'POST') {
             $pdo->rollBack();
             sendJson(['error' => 'Erreur lors de l\'archivage du cycle : ' . $e->getMessage()], 500);
         }
+    }
+
+    if ($action === 'update_admin_photo') {
+        $profilePhoto = $input['profilePhoto'] ?? '';
+        $stmt = $pdo->prepare("UPDATE global_stats SET profilePhoto = ? WHERE id = 1");
+        $stmt->execute([$profilePhoto]);
+        sendJson(['message' => 'Photo administrateur mise à jour.']);
     }
 
     if ($action === 'reset_app') {
