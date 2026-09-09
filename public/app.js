@@ -119,6 +119,68 @@ document.addEventListener('DOMContentLoaded', () => {
         messages: '../api/messages.php'
     };
 
+    let previousNotifIds = null;
+
+    const playNotificationSound = () => {
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start();
+            osc.stop(ctx.currentTime + 0.3);
+        } catch (e) { }
+    };
+
+    const triggerSystemNotification = (title, body) => {
+        try {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.ready.then(reg => {
+                        reg.showNotification(title, {
+                            body: body,
+                            icon: 'icon-512.png',
+                            badge: 'icon-512.png',
+                            vibrate: [200, 100, 200]
+                        });
+                    });
+                } else {
+                    new Notification(title, { body: body, icon: 'icon-512.png' });
+                }
+            }
+        } catch (e) { }
+    };
+
+    const requestNotificationPermission = () => {
+        try {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        } catch (e) { }
+    };
+
+    // BroadcastChannel cross-tab instant notification sync
+    const notifChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('zubiks_notifications_channel') : null;
+    if (notifChannel) {
+        notifChannel.onmessage = (event) => {
+            if (event.data && event.data.type === 'NEW_TRANSACTION') {
+                loadState();
+            }
+        };
+    }
+
     // Load State from PHP / MySQL Backend
     const loadState = async () => {
         try {
@@ -134,13 +196,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     state.argentDebut = parseFloat(data.stats.argentDebut) || 0;
                     state.reglements = data.stats.reglements || "";
                     state.credentials = { email: data.stats.admin_email || 'zubiksservice@gmail.com' };
+                    state.adminProfilePhoto = data.stats.profilePhoto || "";
+
+                    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'admin_second')) {
+                        if (state.adminProfilePhoto) {
+                            currentUser.profilePhoto = state.adminProfilePhoto;
+                            saveActiveSession(currentUser);
+                        }
+                    }
 
                     const textarea = document.querySelector('.modern-textarea');
                     if (textarea && document.activeElement !== textarea) textarea.value = state.reglements;
 
                     const changeEmailInput = document.getElementById('change-email');
-                    if (changeEmailInput && state.credentials.email) {
-                        changeEmailInput.value = state.credentials.email;
+                    if (changeEmailInput) {
+                        if (currentUser && currentUser.role !== 'admin') {
+                            changeEmailInput.value = currentUser.email || '';
+                        } else if (state.credentials.email) {
+                            changeEmailInput.value = state.credentials.email;
+                        }
                     }
                 }
                 state.archives = data.archives || [];
@@ -152,6 +226,29 @@ document.addEventListener('DOMContentLoaded', () => {
             if (membersRes.ok) {
                 const membersData = await membersRes.json();
                 state.members = Array.isArray(membersData) ? membersData : [];
+
+                if (currentUser) {
+                    const freshUser = state.members.find(m => String(m.id) === String(currentUser.id) || (m.nom && currentUser.nom && m.nom.trim().toLowerCase() === currentUser.nom.trim().toLowerCase()));
+                    if (freshUser) {
+                        const newNotifs = getNotificationsArray(freshUser.notifications);
+
+                        if (previousNotifIds !== null) {
+                            const newUnread = newNotifs.filter(n => !n.read && !previousNotifIds.has(String(n.id)));
+                            if (newUnread.length > 0) {
+                                playNotificationSound();
+                                newUnread.forEach(n => {
+                                    showToast(`${n.message}`, 'info');
+                                    triggerSystemNotification('🟢 Zubiks Service Notification', n.message);
+                                });
+                            }
+                        }
+
+                        previousNotifIds = new Set(newNotifs.map(n => String(n.id)));
+
+                        currentUser = { ...currentUser, ...freshUser };
+                        saveActiveSession(currentUser);
+                    }
+                }
             }
 
             // 3. Fetch Transactions
@@ -255,11 +352,93 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Formulaire Mot de Passe Oublié (Forgot Password) & Envoi OTP Direct
+    let pendingResetEmail = '';
+
+    const requestAndSendOtp = async (targetEmail) => {
+        const email = targetEmail ? targetEmail.trim().toLowerCase() : '';
+        if (!email) {
+            showToast("Veuillez saisir votre adresse email.", "error");
+            hideAllAuthForms();
+            if (forgotPasswordWrapper) forgotPasswordWrapper.style.display = 'block';
+            const forgotEmailInput = document.getElementById('forgot-email');
+            if (forgotEmailInput) forgotEmailInput.focus();
+            return false;
+        }
+
+        try {
+            const res = await fetch(`${API.auth}?action=reset_password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Impossible d'envoyer le code de vérification.");
+
+            pendingResetEmail = email;
+            const forgotEmailInput = document.getElementById('forgot-email');
+            if (forgotEmailInput) forgotEmailInput.value = email;
+
+            showToast(data.message || `Code de vérification à 6 chiffres envoyé à ${email}.`, "success");
+
+            // Envoi direct du mail sur l'adresse email du destinataire via le SDK EmailJS
+            if (window.emailjs && data.code) {
+                const serviceId = window.EMAILJS_SERVICE_ID || "service_zubiks";
+                const templateId = window.EMAILJS_TEMPLATE_ID || "template_otp";
+                emailjs.send(serviceId, templateId, {
+                    to_email: email,
+                    user_email: email,
+                    email: email,
+                    recipient_email: email,
+                    code: data.code,
+                    otp_code: data.code,
+                    otp: data.code,
+                    passcode: data.code,
+                    message: `Voici votre code de sécurité à 6 chiffres pour ZUBIKS SERVICE : ${data.code}`
+                }).then(() => {
+                    console.log("EmailJS: Code à 6 chiffres transmis sur l'adresse (" + email + ") avec succès !");
+                }).catch(eErr => {
+                    console.warn("EmailJS info (vérifier Service ID / Template ID) :", eErr);
+                });
+            }
+
+            if (data.code) {
+                showToast(`🔒 Code de sécurité : ${data.code}`, "info");
+            }
+
+            hideAllAuthForms();
+            if (resetPasswordWrapper) resetPasswordWrapper.style.display = 'block';
+            const otpInput = document.getElementById('reset-otp-code');
+            if (otpInput) otpInput.focus();
+            return true;
+        } catch (err) {
+            console.error("Erreur d'envoi OTP :", err);
+            showToast(err.message || "Impossible de trouver le compte.", "error");
+            hideAllAuthForms();
+            if (forgotPasswordWrapper) forgotPasswordWrapper.style.display = 'block';
+            const forgotEmailInput = document.getElementById('forgot-email');
+            if (forgotEmailInput) {
+                forgotEmailInput.value = email;
+                forgotEmailInput.focus();
+            }
+            return false;
+        }
+    };
+
     if (linkForgotPassword) {
         linkForgotPassword.addEventListener('click', (e) => {
             e.preventDefault();
-            hideAllAuthForms();
-            if (forgotPasswordWrapper) forgotPasswordWrapper.style.display = 'block';
+            const loginEmailInput = document.getElementById('email');
+            const loginEmail = loginEmailInput ? loginEmailInput.value.trim() : '';
+
+            if (loginEmail) {
+                requestAndSendOtp(loginEmail);
+            } else {
+                hideAllAuthForms();
+                if (forgotPasswordWrapper) forgotPasswordWrapper.style.display = 'block';
+                const forgotEmailInput = document.getElementById('forgot-email');
+                if (forgotEmailInput) forgotEmailInput.focus();
+            }
         });
     }
 
@@ -271,54 +450,40 @@ document.addEventListener('DOMContentLoaded', () => {
         btnResetToLogin.addEventListener('click', () => btnShowLogin.click());
     }
 
-    // Formulaire Mot de Passe Oublié (Forgot Password)
     const forgotPasswordForm = document.getElementById('forgot-password-form');
     if (forgotPasswordForm) {
         forgotPasswordForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const emailInput = document.getElementById('forgot-email');
-            const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
-
-            if (!email) {
-                showToast("Veuillez saisir votre adresse email.", "error");
-                return;
-            }
-
-            try {
-                const res = await fetch(`${API.auth}?action=reset_password`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Impossible de réinitialiser le mot de passe.");
-
-                showToast(data.message || "Un e-mail de réinitialisation a été envoyé.", "success");
-                forgotPasswordForm.reset();
-                if (btnShowLogin) btnShowLogin.click();
-            } catch (err) {
-                console.error("Erreur forgot-password :", err);
-                showToast(err.message || "Impossible d'envoyer l'e-mail de réinitialisation.", "error");
-            }
+            const email = emailInput ? emailInput.value.trim() : '';
+            await requestAndSendOtp(email);
         });
     }
 
-    // Formulaire Réinitialisation de Mot de Passe (Reset Password)
+    // Formulaire Réinitialisation de Mot de Passe (Reset Password avec OTP 6 chiffres)
     const resetPasswordForm = document.getElementById('reset-password-form');
-    const resetTokenInput = document.getElementById('reset-token-input');
     if (resetPasswordForm) {
         resetPasswordForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const token = resetTokenInput ? resetTokenInput.value.trim() : '';
+            const emailInput = document.getElementById('forgot-email');
+            const email = pendingResetEmail || (emailInput ? emailInput.value.trim().toLowerCase() : '');
+            const otpCodeInput = document.getElementById('reset-otp-code');
+            const code = otpCodeInput ? otpCodeInput.value.trim() : '';
             const newPassword = document.getElementById('reset-new-password').value;
             const confirmPassword = document.getElementById('reset-confirm-password').value;
 
-            if (!token) {
-                showToast("Jeton de réinitialisation manquant ou invalide.", "error");
+            if (!email) {
+                showToast("Adresse e-mail introuvable. Veuillez recommencer l'opération.", "error");
+                hideAllAuthForms();
+                if (forgotPasswordWrapper) forgotPasswordWrapper.style.display = 'block';
                 return;
             }
-            if (!newPassword || newPassword.length < 6) {
-                showToast("Le nouveau mot de passe doit contenir au moins 6 caractères.", "error");
+            if (!code || code.length !== 6) {
+                showToast("Veuillez saisir le code de vérification à 6 chiffres.", "error");
+                return;
+            }
+            if (!newPassword || newPassword.length < 4) {
+                showToast("Le nouveau mot de passe doit contenir au moins 4 caractères.", "error");
                 return;
             }
             if (newPassword !== confirmPassword) {
@@ -327,16 +492,21 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                // Firebase gère la réinitialisation via le lien de l'email, ce formulaire n'est plus utilisé en mode serverless.
-                showToast("La réinitialisation est gérée par le lien reçu par e-mail.", "info");
+                const res = await fetch(`${API.auth}?action=reset_password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, code, newPassword })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Échec de la réinitialisation du mot de passe.");
+
+                showToast(data.message || "Mot de passe réinitialisé avec succès !", "success");
                 resetPasswordForm.reset();
-                if (window.history && window.history.replaceState) {
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }
+                pendingResetEmail = '';
                 if (btnShowLogin) btnShowLogin.click();
             } catch (err) {
                 console.error("Erreur reset-password API :", err);
-                showToast("Erreur de connexion.", "error");
+                showToast(err.message || "Code de vérification invalide.", "error");
             }
         });
     }
@@ -386,8 +556,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!res.ok) throw new Error(data.error || "Erreur lors de l'inscription.");
 
                 await loadState();
+
+                // Envoi direct des mails de bienvenue (Membre & Admin) via EmailJS si disponible
+                if (window.emailjs) {
+                    const serviceId = window.EMAILJS_SERVICE_ID || "service_zubiks";
+                    const templateId = window.EMAILJS_TEMPLATE_ID || "template_otp";
+
+                    // 1. Mail de bienvenue pour le nouveau membre
+                    emailjs.send(serviceId, templateId, {
+                        to_email: email,
+                        user_email: email,
+                        email: email,
+                        recipient_email: email,
+                        user_name: `${nom} ${postnom}`.trim(),
+                        name: `${nom} ${postnom}`.trim(),
+                        message: `Bienvenue chez ZUBIKS SERVICE ! Votre compte (${email}) a été créé avec succès.`
+                    }).catch(eErr => {
+                        console.warn("EmailJS member email info:", eErr);
+                    });
+
+                    // 2. Mail de notification pour l'administrateur
+                    const adminEmail = (state && state.credentials && state.credentials.email) ? state.credentials.email : 'zubiksservice@gmail.com';
+                    emailjs.send(serviceId, templateId, {
+                        to_email: adminEmail,
+                        user_email: adminEmail,
+                        email: adminEmail,
+                        recipient_email: adminEmail,
+                        user_name: "Admin ZUBIKS",
+                        name: "Admin ZUBIKS",
+                        message: `📢 NOUVEAU MEMBRE : Le membre ${nom} ${postnom} (${email}) vient de créer son compte sur ZUBIKS SERVICE. Veuillez vous connecter pour valider son profil.`
+                    }).catch(eErr => {
+                        console.warn("EmailJS admin notification info:", eErr);
+                    });
+                }
+
                 registerForm.reset();
-                showToast("Inscription réussie ! Vous pouvez vous connecter.", "success");
+                showToast("Inscription réussie ! Un e-mail de confirmation vous a été envoyé.", "success");
                 if (btnShowLogin) btnShowLogin.click();
 
                 const loginEmailInput = document.getElementById('email');
@@ -430,6 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dashboardScreen.classList.add('active');
             updateDates();
             renderAll();
+            requestNotificationPermission();
             showToast(`Connexion réussie (${currentUser.role === 'admin' ? 'Administrateur' : currentUser.nom})`, 'success');
         } catch (err) {
             console.error("Erreur de connexion Backend :", err);
@@ -480,6 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 body: JSON.stringify({ profilePhoto: base64String })
                             });
                             currentUser.profilePhoto = base64String;
+                            state.adminProfilePhoto = base64String;
                         } else {
                             await fetch(`${API.members}?action=update_photo`, {
                                 method: 'POST',
@@ -490,7 +696,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (userIndex !== -1) state.members[userIndex].profilePhoto = base64String;
                             currentUser.profilePhoto = base64String;
                         }
+                        saveActiveSession(currentUser);
                         updateHeaderAvatar(currentUser);
+                        renderAll();
                         if (typeof showToast === 'function') showToast("Photo de profil mise à jour !", "success");
                     } catch (error) {
                         console.error("Erreur mise à jour photo:", error);
@@ -692,9 +900,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             });
                         } catch (e) { }
                     }
-                } else if (targetId === 'tab-user-notifications' && currentUser.notifications) {
+                } else if (targetId === 'tab-user-notifications' && currentUser) {
                     let updatedNotifs = false;
-                    const newNotifs = currentUser.notifications.map(n => {
+                    const notifsArr = getNotificationsArray(currentUser.notifications);
+                    const newNotifs = notifsArr.map(n => {
                         if (!n.read) {
                             updatedNotifs = true;
                             return { ...n, read: true };
@@ -709,6 +918,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ id: currentUser.id, notifications: newNotifs })
+                            }).then(r => r.json()).then(data => {
+                                if (data && data.notifications) {
+                                    currentUser.notifications = data.notifications;
+                                    saveActiveSession(currentUser);
+                                    renderAll();
+                                }
                             });
                         } catch (e) { }
                     }
@@ -805,7 +1020,7 @@ document.addEventListener('DOMContentLoaded', () => {
             filteredTransactions.forEach(t => {
                 const dateStr = new Date(t.date || t.timestamp).toLocaleDateString('fr-FR');
                 const type = t.type === 'depot' ? 'Dépôt' : 'Retrait';
-                const amount = (t.amount || 0);
+                const amount = parseFloat(t.amount || 0);
 
                 if (t.type === 'depot') totalDepots += amount;
                 else totalRetraits += amount;
@@ -936,6 +1151,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const getNotificationsArray = (notifs) => {
+        if (Array.isArray(notifs)) return notifs;
+        if (typeof notifs === 'string' && notifs.trim() !== '') {
+            try {
+                const parsed = JSON.parse(notifs);
+                if (Array.isArray(parsed)) return parsed;
+                if (typeof parsed === 'string') {
+                    const parsed2 = JSON.parse(parsed);
+                    if (Array.isArray(parsed2)) return parsed2;
+                }
+            } catch (e) { }
+        }
+        return [];
+    };
+
     const renderAll = () => {
         const memberSearchTerm = (searchMemberInput ? searchMemberInput.value.toLowerCase() : '');
         const depotSearchTerm = (searchDepotInput ? searchDepotInput.value.toLowerCase() : '');
@@ -948,6 +1178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const topNotifBadge = document.getElementById('top-notif-badge');
 
         if (currentUser) {
+            updateHeaderAvatar(currentUser);
             let unreadMessages = 0;
             let unreadNotifs = 0;
 
@@ -956,7 +1187,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 unreadNotifs = (state.members || []).filter(m => m.status === 'pending').length;
             } else {
                 unreadMessages = (state.messages || []).filter(m => String(m.memberId) === String(currentUser.id) && !m.readByUser).length;
-                unreadNotifs = (currentUser.notifications || []).filter(n => !n.read).length;
+                unreadNotifs = getNotificationsArray(currentUser.notifications).filter(n => !n.read).length;
             }
 
             if (topChatBadge) {
@@ -1095,7 +1326,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Render Transactions Table
+        // Render Transactions Table & Global Totals
         if (transactionsTableBody) {
             transactionsTableBody.innerHTML = '';
             let filteredTx = state.transactions || [];
@@ -1110,6 +1341,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 filteredTx = filteredTx.filter(tx => tx.date === transactionFilterDate);
             }
 
+            let totalFilteredDepots = 0;
+            let totalFilteredRetraits = 0;
+
+            filteredTx.forEach(tx => {
+                const amt = parseFloat(tx.amount || 0);
+                if (tx.type === 'depot') totalFilteredDepots += amt;
+                else totalFilteredRetraits += amt;
+            });
+
+            const globalTotalDepotsDisplay = document.getElementById('global-total-depots-display');
+            const globalTotalRetraitsDisplay = document.getElementById('global-total-retraits-display');
+            const globalTotalSoldeDisplay = document.getElementById('global-total-solde-display');
+
+            if (globalTotalDepotsDisplay) globalTotalDepotsDisplay.textContent = `${totalFilteredDepots.toLocaleString('fr-FR')} Fc`;
+            if (globalTotalRetraitsDisplay) globalTotalRetraitsDisplay.textContent = `${totalFilteredRetraits.toLocaleString('fr-FR')} Fc`;
+            if (globalTotalSoldeDisplay) {
+                const netSolde = totalFilteredDepots - totalFilteredRetraits;
+                globalTotalSoldeDisplay.textContent = `${netSolde.toLocaleString('fr-FR')} Fc`;
+            }
+
             if (filteredTx.length > 0) {
                 const reversedTransactions = [...filteredTx].reverse();
                 reversedTransactions.forEach((tx, index) => {
@@ -1121,11 +1372,26 @@ document.addEventListener('DOMContentLoaded', () => {
                         <td class="text-muted">${new Date(tx.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</td>
                         <td><span class="btn-action ${isDepot ? 'btn-success' : 'btn-danger'}" style="background-color:var(--${isDepot ? 'success' : 'danger'}); padding: 3px 8px; font-size: 0.75rem;">${isDepot ? 'Dépôt Cash' : 'Retrait Cash'}</span></td>
                         <td><strong>${tx.memberNom}</strong></td>
-                        <td><span class="${isDepot ? 'text-success' : 'text-danger'}"><strong>${isDepot ? '+' : '-'}${tx.amount.toLocaleString('fr-FR')} Fc</strong></span></td>
+                        <td><span class="${isDepot ? 'text-success' : 'text-danger'}"><strong>${isDepot ? '+' : '-'}${(parseFloat(tx.amount || 0)).toLocaleString('fr-FR')} Fc</strong></span></td>
                         <td><span class="text-muted" style="font-size:0.85em;">${tx.adminNom || 'Admin'}</span></td>
                     `;
                     transactionsTableBody.appendChild(tr);
                 });
+
+                // Ligne de résumé des totaux en bas de tableau
+                const summaryTr = document.createElement('tr');
+                summaryTr.style.background = '#f8fafc';
+                summaryTr.style.fontWeight = 'bold';
+                summaryTr.style.borderTop = '2px solid #cbd5e0';
+                summaryTr.innerHTML = `
+                    <td colspan="5" style="text-align: right; color: var(--primary-dark);">SOMME TOTALE DES TRANSACTIONS :</td>
+                    <td>
+                        <div style="color: var(--success);">🟢 Dépôts : +${totalFilteredDepots.toLocaleString('fr-FR')} Fc</div>
+                        <div style="color: var(--danger);">🔴 Retraits : -${totalFilteredRetraits.toLocaleString('fr-FR')} Fc</div>
+                    </td>
+                    <td style="color: var(--primary-dark);">Solde : ${(totalFilteredDepots - totalFilteredRetraits).toLocaleString('fr-FR')} Fc</td>
+                `;
+                transactionsTableBody.appendChild(summaryTr);
             } else {
                 transactionsTableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding: 20px;">Aucune transaction correspondante.</td></tr>';
             }
@@ -1201,7 +1467,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <td>${new Date(tx.date).toLocaleDateString('fr-FR')}</td>
                             <td class="text-muted">${new Date(tx.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</td>
                             <td><span class="btn-action ${isDepot ? 'btn-success' : 'btn-danger'}" style="background-color:var(--${isDepot ? 'success' : 'danger'}); padding: 3px 8px; font-size: 0.75rem;">${isDepot ? 'Dépôt Cash' : 'Retrait Cash'}</span></td>
-                            <td><span class="${isDepot ? 'text-success' : 'text-danger'}"><strong>${isDepot ? '+' : '-'}${tx.amount.toLocaleString('fr-FR')} Fc</strong></span></td>
+                            <td><span class="${isDepot ? 'text-success' : 'text-danger'}"><strong>${isDepot ? '+' : '-'}${(parseFloat(tx.amount || 0)).toLocaleString('fr-FR')} Fc</strong></span></td>
                             <td><span class="text-muted" style="font-size:0.85em;">${tx.adminNom || 'Admin'}</span></td>
                         `;
                         userTxTableBody.appendChild(tr);
@@ -1215,7 +1481,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const userNotifList = document.getElementById('user-notifications-list');
             const unreadBadge = document.getElementById('unread-notif-badge');
 
-            const notifs = currentUser.notifications || [];
+            const notifs = getNotificationsArray(currentUser.notifications);
             const unreadCount = notifs.filter(n => !n.read).length;
 
             if (unreadBadge) {
@@ -1350,7 +1616,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentUser && currentUser.role !== 'admin') {
             const userChatMessages = document.getElementById('user-chat-messages');
             const userUnreadBadge = document.getElementById('user-unread-msg-badge');
-            const userMsgs = (state.messages || []).filter(m => String(m.memberId) === String(currentUser.id));
+            const userMsgs = (state.messages || []).filter(m => String(m.memberId) === String(currentUser.id) || (m.memberId && currentUser.nom && String(m.memberId).trim().toLowerCase() === String(currentUser.nom).trim().toLowerCase()) || (m.senderName && currentUser.nom && String(m.senderName).trim().toLowerCase() === String(currentUser.nom).trim().toLowerCase() && m.sender === 'user'));
 
             // Mark received admin messages as read when user views messaging tab
             const activeTab = document.querySelector('.tab-pane.active');
@@ -1412,7 +1678,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 2. Admin Chat View
-        if (currentUser && currentUser.role === 'admin') {
+        if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'admin_second')) {
             const adminThreadsContainer = document.getElementById('admin-chat-threads');
             const adminChatMessages = document.getElementById('admin-chat-messages');
             const adminUnreadBadge = document.getElementById('admin-unread-msg-badge');
@@ -1420,7 +1686,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const searchTerm = searchChatInput ? searchChatInput.value.toLowerCase() : '';
 
             const allMsgs = state.messages || [];
-            const activeMembers = state.members.filter(m => m.status !== 'pending');
+            const activeMembers = (state.members || []).filter(m => m.status !== 'pending' && m.role !== 'admin');
+
+            // Auto-sélection du premier membre si aucun sélectionné
+            if (activeMembers.length > 0) {
+                const currentSelectedExists = activeMembers.some(m => String(m.id) === String(selectedAdminChatMemberId));
+                if (!selectedAdminChatMemberId || !currentSelectedExists) {
+                    selectedAdminChatMemberId = activeMembers[0].id;
+                }
+            }
 
             // Total unread messages for admin
             const totalAdminUnread = allMsgs.filter(m => m.sender === 'user' && !m.readByAdmin).length;
@@ -1464,7 +1738,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (filteredMembers.length > 0) {
                     filteredMembers.forEach(m => {
-                        const mMsgs = allMsgs.filter(msg => String(msg.memberId) === String(m.id));
+                        const mMsgs = allMsgs.filter(msg => String(msg.memberId) === String(m.id) || (msg.memberId && m.nom && String(msg.memberId).trim().toLowerCase() === String(m.nom).trim().toLowerCase()) || (msg.senderName && m.nom && String(msg.senderName).trim().toLowerCase() === String(m.nom).trim().toLowerCase() && msg.sender === 'user'));
                         const lastMsg = mMsgs[mMsgs.length - 1];
                         const unreadCount = mMsgs.filter(msg => msg.sender === 'user' && !msg.readByAdmin).length;
 
@@ -1500,7 +1774,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const chatGrid = document.querySelector('.admin-chat-grid');
                             if (chatGrid) chatGrid.classList.add('mobile-chat-open');
 
-                            renderAll();
+                            renderMessaging();
                         };
 
                         item.innerHTML = `
@@ -1532,7 +1806,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (chatInput) chatInput.disabled = false;
                 if (chatSendBtn) chatSendBtn.disabled = false;
 
-                const memberMsgs = allMsgs.filter(msg => String(msg.memberId) === String(selectedMember.id));
+                const memberMsgs = allMsgs.filter(msg => String(msg.memberId) === String(selectedMember.id) || (msg.memberId && selectedMember.nom && String(msg.memberId).trim().toLowerCase() === String(selectedMember.nom).trim().toLowerCase()) || (msg.senderName && selectedMember.nom && String(msg.senderName).trim().toLowerCase() === String(selectedMember.nom).trim().toLowerCase() && msg.sender === 'user'));
                 if (adminChatMessages) {
                     adminChatMessages.innerHTML = '';
                     if (memberMsgs.length > 0) {
@@ -1554,11 +1828,17 @@ document.addEventListener('DOMContentLoaded', () => {
                             `;
                             adminChatMessages.appendChild(bubble);
                         });
-                        adminChatMessages.scrollTop = adminChatMessages.scrollHeight;
+                        setTimeout(() => { adminChatMessages.scrollTop = adminChatMessages.scrollHeight; }, 50);
                     } else {
                         adminChatMessages.innerHTML = '<div class="text-center text-muted" style="margin-top: 60px;">Écrivez ci-dessous pour envoyer un message à ce membre.</div>';
                     }
                 }
+            } else {
+                if (chatHeaderName) chatHeaderName.textContent = 'Sélectionnez un membre';
+                if (chatHeaderInfo) chatHeaderInfo.textContent = '';
+                if (chatInput) chatInput.disabled = true;
+                if (chatSendBtn) chatSendBtn.disabled = true;
+                if (adminChatMessages) adminChatMessages.innerHTML = '<div class="text-center text-muted" style="margin-top: 60px;">Sélectionnez une conversation dans la liste à gauche.</div>';
             }
         }
     };
@@ -1626,38 +1906,106 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Broadcast Message Handler
+    // Broadcast Message Handler (Modal UI Pro)
     const btnBroadcast = document.getElementById('btn-broadcast-message');
-    if (btnBroadcast) {
-        btnBroadcast.addEventListener('click', async () => {
-            const annonce = prompt("Entrez le message ou l'annonce à envoyer à tous les utilisateurs :");
-            if (annonce && annonce.trim() !== '') {
-                if (confirm(`Êtes-vous sûr de vouloir envoyer cette annonce à tous vos membres ?`)) {
-                    const activeMembersList = state.members.filter(m => m.status !== 'pending' && m.role !== 'admin' && m.role !== 'admin_second');
-                    if (activeMembersList.length === 0) {
-                        showToast("Aucun membre actif à qui envoyer l'annonce.", "error");
-                        return;
-                    }
-                    const text = `📢 ANNONCE GÉNÉRALE: ${annonce.trim()}`;
-                    let count = 0;
+    const broadcastModal = document.getElementById('broadcast-modal');
+    const closeBroadcastModal = document.getElementById('close-broadcast-modal');
+    const cancelBroadcastBtn = document.getElementById('cancel-broadcast-btn');
+    const submitBroadcastBtn = document.getElementById('submit-broadcast-btn');
+    const broadcastTextarea = document.getElementById('broadcast-message-text');
+    const broadcastTypeSelect = document.getElementById('broadcast-type');
+    const broadcastMembersCount = document.getElementById('broadcast-members-count');
 
-                    for (const member of activeMembersList) {
-                        try {
-                            await fetch(`${API.messages}`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    memberId: member.id,
-                                    sender: 'admin',
-                                    senderName: 'Administration',
-                                    text: text
-                                })
-                            });
-                            count++;
-                        } catch (e) { }
-                    }
-                    await loadState();
-                    showToast(`Annonce envoyée avec succès à ${count} membre(s) !`, "success");
+    const closeBroadcastModalFunc = () => {
+        if (broadcastModal) broadcastModal.style.display = 'none';
+        if (broadcastTextarea) broadcastTextarea.value = '';
+    };
+
+    if (closeBroadcastModal) closeBroadcastModal.addEventListener('click', closeBroadcastModalFunc);
+    if (cancelBroadcastBtn) cancelBroadcastBtn.addEventListener('click', closeBroadcastModalFunc);
+
+    if (btnBroadcast) {
+        btnBroadcast.addEventListener('click', () => {
+            const activeMembersList = state.members.filter(m => m.status !== 'pending' && m.role !== 'admin' && m.role !== 'admin_second');
+            if (activeMembersList.length === 0) {
+                showToast("Aucun membre actif à qui envoyer l'annonce.", "error");
+                return;
+            }
+            if (broadcastMembersCount) {
+                broadcastMembersCount.textContent = `${activeMembersList.length} membre(s) actif(s)`;
+            }
+            if (broadcastModal) broadcastModal.style.display = 'flex';
+            if (broadcastTextarea) {
+                broadcastTextarea.value = '';
+                setTimeout(() => broadcastTextarea.focus(), 100);
+            }
+        });
+    }
+
+    // Quick emoji insertion
+    document.querySelectorAll('.btn-emoji-quick').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const emoji = btn.getAttribute('data-emoji');
+            if (broadcastTextarea && emoji) {
+                const start = broadcastTextarea.selectionStart;
+                const end = broadcastTextarea.selectionEnd;
+                const val = broadcastTextarea.value;
+                broadcastTextarea.value = val.substring(0, start) + emoji + val.substring(end);
+                broadcastTextarea.focus();
+                broadcastTextarea.selectionStart = broadcastTextarea.selectionEnd = start + emoji.length;
+            }
+        });
+    });
+
+    if (submitBroadcastBtn) {
+        submitBroadcastBtn.addEventListener('click', async () => {
+            const annonceText = broadcastTextarea ? broadcastTextarea.value.trim() : '';
+            if (!annonceText) {
+                showToast("Veuillez saisir le contenu de l'annonce.", "error");
+                if (broadcastTextarea) broadcastTextarea.focus();
+                return;
+            }
+
+            const activeMembersList = state.members.filter(m => m.status !== 'pending' && m.role !== 'admin' && m.role !== 'admin_second');
+            if (activeMembersList.length === 0) {
+                showToast("Aucun membre actif à qui envoyer l'annonce.", "error");
+                return;
+            }
+
+            const typePrefix = broadcastTypeSelect ? broadcastTypeSelect.value : '📢 ANNONCE GÉNÉRALE';
+            const fullMessage = `${typePrefix} :\n${annonceText}`;
+
+            try {
+                submitBroadcastBtn.disabled = true;
+                submitBroadcastBtn.innerHTML = '<span>Diffusion en cours...</span>';
+
+                let count = 0;
+                for (const member of activeMembersList) {
+                    try {
+                        await fetch(`${API.messages}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                memberId: member.id,
+                                sender: 'admin',
+                                senderName: 'Administration',
+                                text: fullMessage
+                            })
+                        });
+                        count++;
+                    } catch (e) { }
+                }
+
+                await loadState();
+                closeBroadcastModalFunc();
+                showToast(`Annonce diffusée avec succès à ${count} membre(s) !`, "success");
+            } catch (err) {
+                console.error("Erreur diffusion annonce:", err);
+                showToast("Erreur lors de la diffusion de l'annonce.", "error");
+            } finally {
+                if (submitBroadcastBtn) {
+                    submitBroadcastBtn.disabled = false;
+                    submitBroadcastBtn.innerHTML = '<span>📢 Diffuser l\'Annonce</span>';
                 }
             }
         });
@@ -1767,19 +2115,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 const member = state.members[memberIndex];
                 const typeName = currentOperationType === 'depot' ? 'dépôt' : 'retrait';
 
-                const maxDepot = (member.parts || 0) * 63000;
-                const maxRetrait = (member.parts || 0) * 62000;
+                const parts = Math.max(1, (member.parts || 1));
+                const minSingleDepot = 1000;
+                const maxTotalDepot = parts * 63000;
+                const minSingleRetrait = 62000; // Minimum fixe de 62 000 Fc peu importe le nombre de parts
+                const maxTotalRetrait = parts * 62000;
+                const soldeDisponible = (member.totalDepot || 0) - (member.totalRetrait || 0);
 
                 if (currentOperationType === 'depot') {
-                    if ((member.totalDepot + amount) > maxDepot) {
-                        const reste = maxDepot - member.totalDepot;
-                        showToast(`Dépôt refusé : Le maximum pour ${member.parts || 0} part(s) est de ${maxDepot.toLocaleString('fr-FR')} Fc. Reste autorisé : ${reste.toLocaleString('fr-FR')} Fc.`, 'error');
+                    if (amount < minSingleDepot) {
+                        showToast(`Dépôt refusé : Le montant minimum pour un dépôt est de ${minSingleDepot.toLocaleString('fr-FR')} Fc.`, 'error');
+                        return;
+                    }
+                    if ((member.totalDepot + amount) > maxTotalDepot) {
+                        const reste = Math.max(0, maxTotalDepot - member.totalDepot);
+                        showToast(`Dépôt refusé : Pour ${parts} part(s), le cumul maximal de dépôt pour un cycle (63 jours) est de ${maxTotalDepot.toLocaleString('fr-FR')} Fc. Reste autorisé : ${reste.toLocaleString('fr-FR')} Fc.`, 'error');
                         return;
                     }
                 } else if (currentOperationType === 'retrait') {
-                    if ((member.totalRetrait + amount) > maxRetrait) {
-                        const reste = maxRetrait - member.totalRetrait;
-                        showToast(`Retrait refusé : Le maximum pour ${member.parts || 0} part(s) est de ${maxRetrait.toLocaleString('fr-FR')} Fc. Reste autorisé : ${reste.toLocaleString('fr-FR')} Fc.`, 'error');
+                    if (amount < minSingleRetrait) {
+                        showToast(`Retrait refusé : Le montant minimum à retirer est de 62 000 Fc.`, 'error');
+                        return;
+                    }
+                    if ((member.totalRetrait + amount) > maxTotalRetrait) {
+                        const reste = Math.max(0, maxTotalRetrait - member.totalRetrait);
+                        showToast(`Retrait refusé : Pour ${parts} part(s), le plafond maximal cumulé de retrait est de ${maxTotalRetrait.toLocaleString('fr-FR')} Fc. Reste autorisé : ${reste.toLocaleString('fr-FR')} Fc.`, 'error');
                         return;
                     }
                 }
@@ -1805,6 +2165,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (!res.ok) throw new Error(data.error || "Erreur lors de l'opération.");
 
                         await loadState();
+                        if (notifChannel) {
+                            notifChannel.postMessage({ type: 'NEW_TRANSACTION', memberId: member.id, memberNom: member.nom });
+                        }
                         operationModal.classList.remove('active');
                         showToast(`Le ${typeName} de ${amount.toLocaleString('fr-FR')} Fc (Cash) a été enregistré.`, 'success');
 
@@ -2119,14 +2482,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnMarkAllRead = document.getElementById('btn-mark-all-read');
     if (btnMarkAllRead) {
         btnMarkAllRead.addEventListener('click', async () => {
-            if (currentUser && currentUser.role !== 'admin' && currentUser.notifications) {
-                currentUser.notifications.forEach(n => n.read = true);
+            if (currentUser) {
+                const notifsArr = getNotificationsArray(currentUser.notifications);
+                notifsArr.forEach(n => n.read = true);
+                currentUser.notifications = notifsArr;
                 try {
-                    await fetch(`${API.members}?action=update_notifs`, {
+                    const res = await fetch(`${API.members}?action=mark_read`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: currentUser.id, notifications: currentUser.notifications })
+                        body: JSON.stringify({ id: currentUser.id })
                     });
+                    const data = await res.json();
+                    if (data && data.notifications) {
+                        currentUser.notifications = data.notifications;
+                        saveActiveSession(currentUser);
+                    }
                 } catch (e) { }
                 renderAll();
                 showToast("Toutes vos notifications ont été marquées comme lues.", "success");
@@ -2144,7 +2514,9 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem(SESSION_KEY, JSON.stringify({
                 role: user.role,
                 id: user.id || null,
-                email: user.email || null
+                email: user.email || null,
+                profilePhoto: user.profilePhoto || null,
+                nom: user.nom || null
             }));
         }
     };
@@ -2167,12 +2539,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentUser = {
                         role: 'admin',
                         nom: 'Admin ZUBIKS',
-                        email: (state.credentials && state.credentials.email) ? state.credentials.email : 'zubiksservice@gmail.com'
+                        email: (state.credentials && state.credentials.email) ? state.credentials.email : 'zubiksservice@gmail.com',
+                        profilePhoto: sess.profilePhoto || state.adminProfilePhoto || null
                     };
                 } else if (sess.id || sess.email) {
                     const userMatch = state.members.find(m => String(m.id) === String(sess.id) || (m.email && m.email.toLowerCase() === (sess.email || '').toLowerCase()));
                     if (userMatch) {
-                        currentUser = userMatch;
+                        currentUser = { ...userMatch, profilePhoto: userMatch.profilePhoto || sess.profilePhoto || null };
                     } else {
                         // Deleted member fallback: revoke session
                         saveActiveSession(null);
@@ -2256,6 +2629,50 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const changeCredentialsForm = document.getElementById('change-credentials-form');
+    if (changeCredentialsForm) {
+        changeCredentialsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const emailInput = document.getElementById('change-email');
+            const passwordInput = document.getElementById('change-password');
+            const email = emailInput ? emailInput.value.trim() : '';
+            const newPassword = passwordInput ? passwordInput.value : '';
+
+            if (!newPassword) {
+                showToast("Veuillez saisir un nouveau mot de passe.", "error");
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API.auth}?action=change_password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: currentUser ? currentUser.id : '',
+                        email: email,
+                        newPassword: newPassword
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Erreur lors de la modification du mot de passe.");
+
+                showToast(data.message || "Mot de passe mis à jour avec succès !", "success");
+                if (passwordInput) passwordInput.value = '';
+
+                // Mettre à jour la session et l'état local en douceur sans réinitialiser l'écran de l'application
+                if (currentUser) {
+                    if (email) currentUser.email = email;
+                    saveActiveSession(currentUser);
+                }
+                await loadState();
+                renderAll();
+            } catch (err) {
+                console.error("Erreur modification mot de passe :", err);
+                showToast(err.message || "Erreur lors de la modification.", "error");
+            }
+        });
+    }
+
     // Initialize
     const initializeAppUi = () => {
         // Fonctions d'initialisation de l'interface
@@ -2267,6 +2684,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initDone = true;
         checkAndRestoreSession();
         initializeAppUi();
+        setupListeners();
     };
 
     loadState().then(finishInit).catch(finishInit);

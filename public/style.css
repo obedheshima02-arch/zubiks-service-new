@@ -1900,7 +1900,7 @@ button {
 
 /* --- Professional Chat Input Bar --- */
 .chat-input-bar {
-    padding: 14px 16px;
+    padding: 12px 16px;
     background: #ffffff;
     border-top: 1px solid #e2e8f0;
     border-bottom-left-radius: var(--radius-md);
@@ -1911,43 +1911,61 @@ button {
 
 .chat-input-wrapper {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     gap: 10px;
     width: 100%;
     background: #f8fafc;
     border: 1.5px solid #cbd5e0;
-    border-radius: 20px;
-    padding: 6px 8px 6px 16px;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.02);
-    transition: all 0.25s ease;
+    border-radius: 24px;
+    padding: 4px 6px 4px 16px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     box-sizing: border-box;
 }
 
 .chat-input-wrapper:focus-within {
     background: #ffffff;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3.5px rgba(43, 108, 176, 0.15), inset 0 1px 2px rgba(0, 0, 0, 0.02);
+    border-color: #10b981;
+    box-shadow: 0 0 0 3.5px rgba(16, 185, 129, 0.18), inset 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
-.chat-input-field {
+.chat-input-field,
+textarea.chat-input-field,
+.chat-input-wrapper textarea.chat-input-field {
     flex: 1;
     min-width: 0;
-    min-height: 26px;
-    max-height: 140px;
-    padding: 6px 0;
-    border: none;
-    background: transparent;
-    font-size: 0.98rem;
-    font-family: 'Inter', sans-serif;
-    color: var(--text-main);
-    outline: none;
-    resize: none;
-    line-height: 1.45;
-    overflow-y: auto;
+    min-height: 24px;
+    max-height: 120px;
+    padding: 8px 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    font-size: 0.95rem !important;
+    font-family: 'Inter', sans-serif !important;
+    color: #1e293b !important;
+    outline: none !important;
+    resize: none !important;
+    line-height: 1.45 !important;
+    overflow-y: auto !important;
+    box-shadow: none !important;
+    transform: none !important;
+    border-radius: 0 !important;
+}
+
+.chat-input-field:focus,
+textarea.chat-input-field:focus,
+.chat-input-wrapper textarea.chat-input-field:focus {
+    outline: none !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: none !important;
+    border-color: transparent !important;
 }
 
 .chat-input-field::placeholder {
-    color: #a0aec0;
+    color: #94a3b8 !important;
+    font-weight: 400;
 }
 
 .chat-input-field:disabled {
@@ -1959,32 +1977,37 @@ button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    height: 42px;
-    padding: 0 20px;
+    gap: 6px;
+    height: 38px;
+    padding: 0 18px;
     border: none;
-    border-radius: 22px;
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    border-radius: 20px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     color: white;
     font-weight: 600;
-    font-size: 0.92rem;
+    font-size: 0.9rem;
     cursor: pointer;
-    box-shadow: 0 3px 10px rgba(43, 108, 176, 0.3);
-    transition: all 0.2s ease;
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.28);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     white-space: nowrap;
     flex-shrink: 0;
 }
 
 .chat-send-btn:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 5px 14px rgba(43, 108, 176, 0.4);
+    box-shadow: 0 5px 14px rgba(16, 185, 129, 0.4);
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.chat-send-btn:active:not(:disabled) {
+    transform: translateY(0);
 }
 
 .chat-send-btn:disabled {
-    background: #cbd5e0;
-    box-shadow: none;
+    background: #cbd5e0 !important;
+    box-shadow: none !important;
     cursor: not-allowed;
-    opacity: 0.6;
+    opacity: 0.65;
 }
 
 @media (max-width: 768px) {
@@ -2030,10 +2053,14 @@ button {
         border-radius: 24px !important;
     }
 
-    .chat-input-field {
-        height: 42px !important;
+    .chat-input-field,
+    textarea.chat-input-field {
+        min-height: 36px !important;
         font-size: 1rem !important;
-        /* 16px prevents iOS auto zoom */
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        outline: none !important;
     }
 
     .chat-send-btn {

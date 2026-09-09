@@ -3,13 +3,17 @@
 
 require_once __DIR__ . '/db.php';
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 $method = $_SERVER['REQUEST_METHOD'];
-$action = $_GET['action'] ?? '';
 $input = getJsonInput();
+$action = $_GET['action'] ?? ($input['action'] ?? '');
 
 // GET: Récupérer les stats globales et archives
 if ($method === 'GET') {
+    recalculateTotals($pdo);
+
     $stmtStats = $pdo->query("SELECT * FROM global_stats WHERE id = 1");
     $stats = $stmtStats->fetch() ?: [
         'dailyDepots' => 0,
@@ -85,6 +89,25 @@ if ($method === 'POST') {
 
             $stmtR = $pdo->query("UPDATE global_stats SET cycleDepots = 0, cycleRetraits = 0, dailyDepots = 0, dailyRetraits = 0 WHERE id = 1");
             $pdo->query("UPDATE members SET totalDepot = 0, totalRetrait = 0");
+            $pdo->query("DELETE FROM transactions");
+
+            // Envoyer une notification automatique à tous les membres
+            $allMembers = $pdo->query("SELECT id, notifications FROM members")->fetchAll();
+            $notifMsg = "🚀 Un nouveau cycle de ristourne (63 jours / 9 semaines) vient d'être lancé par l'administration ! Vos compteurs ont été réinitialisés pour ce nouveau cycle.";
+            $baseNotifId = 'notif_cycle_' . time();
+
+            foreach ($allMembers as $m) {
+                $mNotifs = parseJsonField($m['notifications'] ?? '');
+                $mNotifs[] = [
+                    'id' => $baseNotifId . '_' . rand(100, 999),
+                    'message' => $notifMsg,
+                    'date' => $now,
+                    'read' => false
+                ];
+                $stmtU = $pdo->prepare("UPDATE members SET notifications = ? WHERE id = ?");
+                $stmtU->execute([json_encode($mNotifs, JSON_UNESCAPED_UNICODE), $m['id']]);
+            }
+
             $pdo->commit();
 
             sendJson(['message' => 'Cycle archivé avec succès.']);

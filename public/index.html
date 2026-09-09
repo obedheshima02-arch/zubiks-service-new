@@ -13,7 +13,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=5">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#059669">
     <link rel="apple-touch-icon" href="icon-512.png">
@@ -31,6 +31,9 @@
                 publicKey: "8YpcdEI31a-Y81ilz",
             });
         })();
+        window.EMAILJS_PUBLIC_KEY = "8YpcdEI31a-Y81ilz";
+        window.EMAILJS_SERVICE_ID = "service_zubiks";
+        window.EMAILJS_TEMPLATE_ID = "template_otp";
     </script>
 </head>
 
@@ -271,11 +274,11 @@
                             </div>
                         </div>
                         <button type="submit" class="btn-primary btn-forgot-submit">
-                            <span>Envoyer le lien de réinitialisation</span>
+                            <span>Recevoir le code de vérification</span>
                             <span class="arrow">→</span>
                         </button>
                         <p class="text-muted text-center mt-10" style="font-size: 0.82rem; line-height: 1.4;">
-                            💡 Un lien de réinitialisation temporaire sera envoyé à cette adresse.
+                            💡 Un code de vérification à 6 chiffres sera envoyé à cette adresse email pour sécuriser votre compte.
                         </p>
                     </form>
                 </div>
@@ -288,6 +291,18 @@
                     <form id="reset-password-form">
                         <input type="hidden" id="reset-token-input">
                         <div class="input-group">
+                            <label for="reset-otp-code">Code de vérification (6 chiffres)</label>
+                            <div class="input-with-icon">
+                                <span class="input-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                    </svg>
+                                </span>
+                                <input type="text" id="reset-otp-code" placeholder="Ex: 184920" maxlength="6" inputmode="numeric" required style="letter-spacing: 2px; font-weight: bold; text-align: center;">
+                            </div>
+                        </div>
+                        <div class="input-group">
                             <label for="reset-new-password">Nouveau mot de passe</label>
                             <div class="input-with-icon">
                                 <span class="input-icon">
@@ -298,7 +313,7 @@
                                     </svg>
                                 </span>
                                 <input type="password" id="reset-new-password" placeholder="••••••••" required
-                                    minlength="6">
+                                    minlength="4">
                             </div>
                         </div>
                         <div class="input-group">
@@ -312,11 +327,11 @@
                                     </svg>
                                 </span>
                                 <input type="password" id="reset-confirm-password" placeholder="••••••••" required
-                                    minlength="6">
+                                    minlength="4">
                             </div>
                         </div>
                         <button type="submit" class="btn-primary btn-reset-submit">
-                            <span>Réinitialiser mon mot de passe</span>
+                            <span>Valider et modifier le mot de passe</span>
                             <span class="arrow">→</span>
                         </button>
                     </form>
@@ -884,6 +899,22 @@
                                 </button>
                             </div>
                         </div>
+                        <!-- Summary Stats Cards for Global Transactions -->
+                        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                            <div class="stat-card glass-inner" style="padding: 15px; border-left: 4px solid var(--success); background: #f0fdf4;">
+                                <span class="text-muted" style="font-size: 0.85rem; font-weight: 600;">🟢 Total Dépôts (Sélection)</span>
+                                <h3 id="global-total-depots-display" style="color: var(--success); margin: 5px 0 0 0; font-size: 1.3rem;">0 Fc</h3>
+                            </div>
+                            <div class="stat-card glass-inner" style="padding: 15px; border-left: 4px solid var(--danger); background: #fef2f2;">
+                                <span class="text-muted" style="font-size: 0.85rem; font-weight: 600;">🔴 Total Retraits (Sélection)</span>
+                                <h3 id="global-total-retraits-display" style="color: var(--danger); margin: 5px 0 0 0; font-size: 1.3rem;">0 Fc</h3>
+                            </div>
+                            <div class="stat-card glass-inner" style="padding: 15px; border-left: 4px solid var(--primary-color); background: #f0f9ff;">
+                                <span class="text-muted" style="font-size: 0.85rem; font-weight: 600;">💳 Solde Net Disponible</span>
+                                <h3 id="global-total-solde-display" style="color: var(--primary-dark); margin: 5px 0 0 0; font-size: 1.3rem;">0 Fc</h3>
+                            </div>
+                        </div>
+
                         <div class="table-responsive">
                             <table id="transactions-table" class="modern-table">
                                 <thead>
@@ -1243,8 +1274,6 @@
                         </div>
                     </div>
                 </div>
-
-            </div>
 
             <!-- Tab Admin & Sécurité -->
             <div id="tab-admin-security" class="tab-pane fade-in">
@@ -1615,24 +1644,85 @@
         </div>
     </div>
 
+    <!-- Modal Diffusion Annonce Officielle -->
+    <div id="broadcast-modal" class="modal">
+        <div class="modal-content glass-panel" style="max-width: 550px; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(226, 232, 240, 0.8); padding-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="background: #fefcbf; color: #d69e2e; padding: 10px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.25rem; color: #1a202c; font-weight: 700;">Diffuser une Annonce</h3>
+                        <small class="text-muted" style="font-size: 0.82rem;">Message officiel à l'attention de tous les membres</small>
+                    </div>
+                </div>
+                <span class="close-modal" id="close-broadcast-modal">&times;</span>
+            </div>
+            <div class="modal-body" style="padding-top: 20px;">
+                <div style="background: linear-gradient(135deg, #ebf8ff 0%, #e6fffa 100%); border-left: 4px solid var(--primary-color); padding: 12px 15px; border-radius: 8px; margin-bottom: 20px; font-size: 0.85rem; color: #2c5282; line-height: 1.5;">
+                    📢 <strong>Information :</strong> Cette annonce sera immédiatement publiée dans la messagerie de <strong id="broadcast-members-count">tous les membres</strong>.
+                </div>
+
+                <div class="form-group mb-15">
+                    <label for="broadcast-type" style="font-weight: 600; font-size: 0.88rem; color: #4a5568; margin-bottom: 6px; display: block;">Type d'annonce :</label>
+                    <select id="broadcast-type" class="large-input" style="width: 100%; border-radius: 8px; font-size: 0.9rem;">
+                        <option value="📢 ANNONCE GÉNÉRALE">📢 Annonce Générale</option>
+                        <option value="🚨 RAPPEL IMPORTANT">🚨 Rappel Important</option>
+                        <option value="💵 INFORMATION DE PAIEMENT">💵 Information de Paiement / Ristourne</option>
+                        <option value="ℹ️ COMMUNICATION OFFICIELLE">ℹ️ Communication Officielle</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label for="broadcast-message-text" style="font-weight: 600; font-size: 0.88rem; color: #4a5568;">Contenu du message :</label>
+                        <div class="emoji-toolbar" style="display: flex; gap: 4px;">
+                            <button type="button" class="btn-emoji-quick" data-emoji="📢" title="Annonce" style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 0.85rem; cursor: pointer;">📢</button>
+                            <button type="button" class="btn-emoji-quick" data-emoji="🚨" title="Urgent" style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 0.85rem; cursor: pointer;">🚨</button>
+                            <button type="button" class="btn-emoji-quick" data-emoji="⚠️" title="Attention" style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 0.85rem; cursor: pointer;">⚠️</button>
+                            <button type="button" class="btn-emoji-quick" data-emoji="✅" title="Validé" style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 0.85rem; cursor: pointer;">✅</button>
+                            <button type="button" class="btn-emoji-quick" data-emoji="📅" title="Date" style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 0.85rem; cursor: pointer;">📅</button>
+                            <button type="button" class="btn-emoji-quick" data-emoji="💵" title="Paiement" style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 0.85rem; cursor: pointer;">💵</button>
+                        </div>
+                    </div>
+                    <textarea id="broadcast-message-text" rows="5" class="large-input" style="width: 100%; border-radius: 10px; padding: 12px; font-size: 0.95rem; line-height: 1.5; resize: vertical;" placeholder="Rédigez ici votre annonce officielle à l'attention de tous les membres..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: flex-end; gap: 10px; padding-top: 15px; border-top: 1px solid rgba(226, 232, 240, 0.8);">
+                <button type="button" id="cancel-broadcast-btn" class="btn-secondary" style="border-radius: 8px;">Annuler</button>
+                <button type="button" id="submit-broadcast-btn" class="btn-primary" style="background: linear-gradient(135deg, #d69e2e 0%, #b7791f 100%); color: white; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                    <span>📢 Diffuser l'Annonce</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- jsPDF pour l'export de tableau en PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
-    <!-- Service Worker Registration for PWA -->
+    <!-- Enregistrement Service Worker PWA -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                    })
-                    .catch(err => {
-                        console.log('ServiceWorker registration failed: ', err);
-                    });
+                navigator.serviceWorker.register('sw.js').then(reg => {
+                    console.log('Service Worker PWA actif.');
+                }).catch(err => {
+                    console.warn('Service Worker non enregistré:', err);
+                });
+            });
+            navigator.serviceWorker.addEventListener('message', event => {
+                if (event.data && event.data.action === 'NAVIGATE_NOTIFICATIONS') {
+                    const userNotifBtn = document.querySelector('.nav-btn[data-target="tab-user-notifications"]');
+                    if (userNotifBtn) userNotifBtn.click();
+                }
             });
         }
     </script>

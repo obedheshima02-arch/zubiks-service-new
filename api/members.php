@@ -3,7 +3,9 @@
 
 require_once __DIR__ . '/db.php';
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 $input = getJsonInput();
@@ -16,7 +18,7 @@ if ($method === 'GET') {
         $stmt->execute([$id]);
         $m = $stmt->fetch();
         if ($m) {
-            $m['notifications'] = !empty($m['notifications']) ? (json_decode($m['notifications'], true) ?: []) : [];
+            syncMemberTransactionNotifs($pdo, $m);
             sendJson($m);
         } else {
             sendJson(['error' => 'Membre introuvable.'], 404);
@@ -25,7 +27,7 @@ if ($method === 'GET') {
         $stmt = $pdo->query("SELECT id, nom, postnom, sexe, email, role, status, parts, totalDepot, totalRetrait, dateAjout, profilePhoto, notifications FROM members ORDER BY nom ASC");
         $members = $stmt->fetchAll();
         foreach ($members as &$m) {
-            $m['notifications'] = !empty($m['notifications']) ? (json_decode($m['notifications'], true) ?: []) : [];
+            syncMemberTransactionNotifs($pdo, $m);
         }
         sendJson($members);
     }
@@ -107,12 +109,46 @@ if ($method === 'POST') {
         sendJson(['message' => 'Photo de profil mise à jour.']);
     }
 
-    if ($action === 'update_notifs') {
+    if ($action === 'update_notifs' || $action === 'mark_read') {
         $id = $input['id'] ?? '';
-        $notifications = json_encode($input['notifications'] ?? []);
-        $stmt = $pdo->prepare("UPDATE members SET notifications = ? WHERE id = ?");
-        $stmt->execute([$notifications, $id]);
-        sendJson(['message' => 'Notifications mises à jour.']);
+        if (empty($id)) {
+            sendJson(['error' => 'ID requis.'], 400);
+        }
+
+        $stmtSelect = $pdo->prepare("SELECT notifications FROM members WHERE id = ?");
+        $stmtSelect->execute([$id]);
+        $mRow = $stmtSelect->fetch();
+
+        $dbNotifs = parseJsonField($mRow['notifications'] ?? '');
+        $incomingNotifs = $input['notifications'] ?? null;
+
+        if (is_array($incomingNotifs)) {
+            $readIds = [];
+            foreach ($incomingNotifs as $in) {
+                if (!empty($in['read']) && !empty($in['id'])) {
+                    $readIds[$in['id']] = true;
+                }
+            }
+
+            foreach ($dbNotifs as &$dbN) {
+                if (isset($dbN['id']) && isset($readIds[$dbN['id']])) {
+                    $dbN['read'] = true;
+                } elseif ($action === 'mark_read') {
+                    $dbN['read'] = true;
+                }
+            }
+            unset($dbN);
+        } elseif ($action === 'mark_read') {
+            foreach ($dbNotifs as &$dbN) {
+                $dbN['read'] = true;
+            }
+            unset($dbN);
+        }
+
+        $cleanJson = json_encode($dbNotifs, JSON_UNESCAPED_UNICODE);
+        $stmtU = $pdo->prepare("UPDATE members SET notifications = ? WHERE id = ?");
+        $stmtU->execute([$cleanJson, $id]);
+        sendJson(['message' => 'Notifications mises à jour.', 'notifications' => $dbNotifs]);
     }
 }
 
