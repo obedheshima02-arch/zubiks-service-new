@@ -48,28 +48,36 @@ function sendTransactionalEmail($to, $subject, $messageText, $replyTo = 'zubikss
              . "Content-Type: text/plain; charset=UTF-8\r\n";
     @mail($to, $subject, $messageText, $headers);
 
-    // 2. Si clé API Brevo (Sendinblue) configurée : envoi HTTPS garanti
+    // 2. Si clé API Brevo configurée : envoi HTTPS garanti avec basculement d'expéditeur validé
     if (!empty($BREVO_API_KEY)) {
-        $payload = json_encode([
-            "sender" => ["name" => "ZUBIKS SERVICE", "email" => "zubiksservice@gmail.com"],
-            "to" => [["email" => $to]],
-            "subject" => $subject,
-            "textContent" => $messageText
-        ], JSON_UNESCAPED_UNICODE);
+        $senders = ["zubiksservice@gmail.com", "obedheshima02@gmail.com"];
+        foreach ($senders as $senderEmail) {
+            $payload = json_encode([
+                "sender" => ["name" => "ZUBIKS SERVICE", "email" => $senderEmail],
+                "to" => [["email" => $to]],
+                "subject" => $subject,
+                "textContent" => $messageText
+            ], JSON_UNESCAPED_UNICODE);
 
-        if (function_exists('curl_init')) {
-            $ch = curl_init("https://api.brevo.com/v3/smtp/email");
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "api-key: " . $BREVO_API_KEY,
-                "Content-Type: application/json",
-                "Accept: application/json"
-            ]);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-            @curl_exec($ch);
-            curl_close($ch);
+            if (function_exists('curl_init')) {
+                $ch = curl_init("https://api.brevo.com/v3/smtp/email");
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    "api-key: " . $BREVO_API_KEY,
+                    "Content-Type: application/json",
+                    "Accept: application/json"
+                ]);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+                $res = @curl_exec($ch);
+                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($code >= 200 && $code < 300) {
+                    break;
+                }
+            }
         }
     }
     return true;
