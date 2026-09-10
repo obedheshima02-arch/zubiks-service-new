@@ -10,6 +10,12 @@ if (session_status() === PHP_SESSION_NONE) {
 $action = $_GET['action'] ?? '';
 $input = getJsonInput();
 
+if ($action === 'reset_admin' || isset($_GET['reset_admin'])) {
+    $pdo->exec("UPDATE global_stats SET admin_password = NULL WHERE id = 1");
+    sendJson(['message' => 'Mot de passe administrateur réinitialisé avec succès. Vous pouvez maintenant vous connecter avec le mot de passe de votre choix.']);
+}
+
+
 if ($action === 'login') {
     $email = strtolower(trim($input['email'] ?? ''));
     $password = $input['password'] ?? '';

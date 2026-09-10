@@ -141,4 +141,3 @@ function recalculateTotals($pdo) {
 
     $pdo->prepare("UPDATE global_stats SET cycleDepots = ?, cycleRetraits = ? WHERE id = 1")->execute([$totDep, $totRet]);
 }
-
