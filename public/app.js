@@ -164,11 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const requestNotificationPermission = () => {
-        try {
-            if ('Notification' in window && Notification.permission === 'default') {
-                Notification.requestPermission();
-            }
-        } catch (e) { }
+        // Désactivé pour éviter l'avertissement "Spam potentiel" de Chrome Android sur les sous-domaines gratuits
+        return;
     };
 
     // BroadcastChannel cross-tab instant notification sync
