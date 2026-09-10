@@ -402,10 +402,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
-            if (data.code) {
-                showToast(`🔒 Code de sécurité : ${data.code}`, "info");
-            }
-
             hideAllAuthForms();
             if (resetPasswordWrapper) resetPasswordWrapper.style.display = 'block';
             const otpInput = document.getElementById('reset-otp-code');
@@ -2046,14 +2042,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
-        toast.innerHTML = type === 'success' ? `✅ ${message}` : `❌ ${message}`;
+
+        let icon = '✅';
+        if (type === 'error') {
+            icon = '❌';
+        } else if (type === 'info') {
+            icon = 'ℹ️';
+        } else if (type === 'warning') {
+            icon = '⚠️';
+        }
+
+        // Si le message commence déjà par un emoji, ne pas ajouter d'icône en double
+        const cleanMsg = String(message || '').trim();
+        const startsWithEmoji = /^[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F680}-\u{1F6FF}]/u.test(cleanMsg);
+
+        toast.innerHTML = startsWithEmoji ? cleanMsg : `${icon} ${cleanMsg}`;
 
         container.appendChild(toast);
 
         setTimeout(() => {
             toast.style.animation = 'fadeOut 0.3s ease forwards';
             setTimeout(() => toast.remove(), 300);
-        }, 3000);
+        }, 3500);
     };
 
     window.openOperationModal = (id, nom, type) => {

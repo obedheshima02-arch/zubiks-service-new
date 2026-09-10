@@ -27,9 +27,13 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <script type="text/javascript">
         (function () {
-            emailjs.init({
-                publicKey: "8YpcdEI31a-Y81ilz",
-            });
+            if (typeof emailjs !== 'undefined') {
+                try {
+                    emailjs.init("8YpcdEI31a-Y81ilz");
+                } catch(e) {
+                    console.warn("EmailJS init:", e);
+                }
+            }
         })();
         window.EMAILJS_PUBLIC_KEY = "8YpcdEI31a-Y81ilz";
         window.EMAILJS_SERVICE_ID = "service_zubiks";

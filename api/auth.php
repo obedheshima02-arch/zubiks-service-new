@@ -202,17 +202,19 @@ if ($action === 'reset_password' || $action === 'send_reset_code') {
                  . "Si vous n'êtes pas à l'origine de cette demande, veuillez ignorer ce message.\n\n"
                  . "Cordialement,\n"
                  . "L'équipe ZUBIKS SERVICE";
-        $headers = "From: ZUBIKS SERVICE <no-reply@zubiks.com>\r\n"
-                 . "Reply-To: support@zubiks.com\r\n"
+                 
+        $serverDomain = $_SERVER['HTTP_HOST'] ?? 'zubiksservice.infinityfreeapp.com';
+        $headers = "From: ZUBIKS SERVICE <no-reply@{$serverDomain}>\r\n"
+                 . "Reply-To: zubiksservice@gmail.com\r\n"
+                 . "X-Mailer: PHP/" . phpversion() . "\r\n"
                  . "MIME-Version: 1.0\r\n"
                  . "Content-Type: text/plain; charset=UTF-8\r\n";
 
         @mail($email, $subject, $message, $headers);
 
         sendJson([
-            'message' => 'Un code de vérification à 6 chiffres a été envoyé à ' . $email . '.',
-            'email' => $email,
-            'code' => $generatedCode // Transmis pour démo / dev si serveur SMTP non configuré
+            'message' => 'Un code de vérification à 6 chiffres a été envoyé à l\'adresse ' . $email . '. Veuillez vérifier votre boîte de réception ou le dossier Spams.',
+            'email' => $email
         ]);
     }
 
@@ -299,8 +301,11 @@ if ($action === 'register' || $action === 'signup') {
                     . "Merci pour votre confiance ❤️\n\n"
                     . "Zubiks Service — Votre confiance, notre engagement.";
 
-    $welcomeHeaders = "From: ZUBIKS SERVICE <no-reply@zubiks.com>\r\n"
-                    . "Reply-To: support@zubiks.com\r\n"
+    $serverDomain = $_SERVER['HTTP_HOST'] ?? 'zubiksservice.infinityfreeapp.com';
+
+    $welcomeHeaders = "From: ZUBIKS SERVICE <no-reply@{$serverDomain}>\r\n"
+                    . "Reply-To: zubiksservice@gmail.com\r\n"
+                    . "X-Mailer: PHP/" . phpversion() . "\r\n"
                     . "MIME-Version: 1.0\r\n"
                     . "Content-Type: text/plain; charset=UTF-8\r\n";
 
@@ -330,8 +335,9 @@ if ($action === 'register' || $action === 'signup') {
                   . "Zubiks Service\n"
                   . "Votre confiance, notre engagement.";
 
-    $adminHeaders = "From: ZUBIKS SERVICE <no-reply@zubiks.com>\r\n"
+    $adminHeaders = "From: ZUBIKS SERVICE <no-reply@{$serverDomain}>\r\n"
                   . "Reply-To: {$email}\r\n"
+                  . "X-Mailer: PHP/" . phpversion() . "\r\n"
                   . "MIME-Version: 1.0\r\n"
                   . "Content-Type: text/plain; charset=UTF-8\r\n";
 
