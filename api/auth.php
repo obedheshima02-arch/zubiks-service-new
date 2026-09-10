@@ -214,7 +214,8 @@ if ($action === 'reset_password' || $action === 'send_reset_code') {
 
         sendJson([
             'message' => 'Un code de vérification à 6 chiffres a été envoyé à l\'adresse ' . $email . '. Veuillez vérifier votre boîte de réception ou le dossier Spams.',
-            'email' => $email
+            'email' => $email,
+            'code' => $generatedCode
         ]);
     }
 
