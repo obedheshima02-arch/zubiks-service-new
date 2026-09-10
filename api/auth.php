@@ -193,7 +193,6 @@ if ($action === 'reset_password' || $action === 'send_reset_code') {
             'expires' => time() + 900 // Code valide 15 minutes
         ];
 
-        // Envoi du mail par la fonction native PHP mail()
         $subject = "ZUBIKS SERVICE - Code de sécurité : $generatedCode";
         $message = "Bonjour,\n\n"
                  . "Voici votre code de vérification à 6 chiffres pour réinitialiser votre mot de passe sur ZUBIKS SERVICE :\n\n"
@@ -202,15 +201,8 @@ if ($action === 'reset_password' || $action === 'send_reset_code') {
                  . "Si vous n'êtes pas à l'origine de cette demande, veuillez ignorer ce message.\n\n"
                  . "Cordialement,\n"
                  . "L'équipe ZUBIKS SERVICE";
-                 
-        $serverDomain = $_SERVER['HTTP_HOST'] ?? 'zubiksservice.infinityfreeapp.com';
-        $headers = "From: ZUBIKS SERVICE <no-reply@{$serverDomain}>\r\n"
-                 . "Reply-To: zubiksservice@gmail.com\r\n"
-                 . "X-Mailer: PHP/" . phpversion() . "\r\n"
-                 . "MIME-Version: 1.0\r\n"
-                 . "Content-Type: text/plain; charset=UTF-8\r\n";
 
-        @mail($email, $subject, $message, $headers);
+        sendTransactionalEmail($email, $subject, $message, 'zubiksservice@gmail.com');
 
         sendJson([
             'message' => 'Un code de vérification à 6 chiffres a été envoyé à l\'adresse ' . $email . '. Veuillez vérifier votre boîte de réception ou le dossier Spams.',
@@ -302,15 +294,7 @@ if ($action === 'register' || $action === 'signup') {
                     . "Merci pour votre confiance ❤️\n\n"
                     . "Zubiks Service — Votre confiance, notre engagement.";
 
-    $serverDomain = $_SERVER['HTTP_HOST'] ?? 'zubiksservice.infinityfreeapp.com';
-
-    $welcomeHeaders = "From: ZUBIKS SERVICE <no-reply@{$serverDomain}>\r\n"
-                    . "Reply-To: zubiksservice@gmail.com\r\n"
-                    . "X-Mailer: PHP/" . phpversion() . "\r\n"
-                    . "MIME-Version: 1.0\r\n"
-                    . "Content-Type: text/plain; charset=UTF-8\r\n";
-
-    @mail($email, $welcomeSubject, $welcomeMessage, $welcomeHeaders);
+    sendTransactionalEmail($email, $welcomeSubject, $welcomeMessage, 'zubiksservice@gmail.com');
 
     // Récupérer l'email administrateur pour la notification
     $stmtStats = $pdo->query("SELECT admin_email FROM global_stats WHERE id = 1");
@@ -336,13 +320,7 @@ if ($action === 'register' || $action === 'signup') {
                   . "Zubiks Service\n"
                   . "Votre confiance, notre engagement.";
 
-    $adminHeaders = "From: ZUBIKS SERVICE <no-reply@{$serverDomain}>\r\n"
-                  . "Reply-To: {$email}\r\n"
-                  . "X-Mailer: PHP/" . phpversion() . "\r\n"
-                  . "MIME-Version: 1.0\r\n"
-                  . "Content-Type: text/plain; charset=UTF-8\r\n";
-
-    @mail($adminEmail, $adminSubject, $adminMessage, $adminHeaders);
+    sendTransactionalEmail($adminEmail, $adminSubject, $adminMessage, $email);
 
     $userObj = [
         'id' => $newId,

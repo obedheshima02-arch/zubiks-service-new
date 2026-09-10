@@ -32,6 +32,49 @@ try {
     exit();
 }
 
+// Config e-mail transactionnel (Optionnel : Clé API Brevo gratuite si mail() PHP est bloqué par l'hébergeur)
+$BREVO_API_KEY = getenv('BREVO_API_KEY') ?: '';
+
+function sendTransactionalEmail($to, $subject, $messageText, $replyTo = 'zubiksservice@gmail.com') {
+    global $BREVO_API_KEY;
+    if (empty($to)) return false;
+
+    // 1. Envoi par mail() PHP natif
+    $domain = $_SERVER['HTTP_HOST'] ?? 'zubiksservice.infinityfreeapp.com';
+    $headers = "From: ZUBIKS SERVICE <no-reply@{$domain}>\r\n"
+             . "Reply-To: {$replyTo}\r\n"
+             . "X-Mailer: PHP/" . phpversion() . "\r\n"
+             . "MIME-Version: 1.0\r\n"
+             . "Content-Type: text/plain; charset=UTF-8\r\n";
+    @mail($to, $subject, $messageText, $headers);
+
+    // 2. Si clé API Brevo (Sendinblue) configurée : envoi HTTPS garanti
+    if (!empty($BREVO_API_KEY)) {
+        $payload = json_encode([
+            "sender" => ["name" => "ZUBIKS SERVICE", "email" => "zubiksservice@gmail.com"],
+            "to" => [["email" => $to]],
+            "subject" => $subject,
+            "textContent" => $messageText
+        ], JSON_UNESCAPED_UNICODE);
+
+        if (function_exists('curl_init')) {
+            $ch = curl_init("https://api.brevo.com/v3/smtp/email");
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "api-key: " . $BREVO_API_KEY,
+                "Content-Type: application/json",
+                "Accept: application/json"
+            ]);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            @curl_exec($ch);
+            curl_close($ch);
+        }
+    }
+    return true;
+}
+
 function sendJson($data, $statusCode = 200) {
     http_response_code($statusCode);
     echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);

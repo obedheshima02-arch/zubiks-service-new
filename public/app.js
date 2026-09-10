@@ -385,6 +385,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.emailjs && data.code) {
                 const serviceId = window.EMAILJS_SERVICE_ID || "service_zubiks";
                 const templateId = window.EMAILJS_TEMPLATE_ID || "template_otp";
+                const publicKey = window.EMAILJS_PUBLIC_KEY || "8YpcdEI31a-Y81ilz";
+
                 emailjs.send(serviceId, templateId, {
                     to_email: email,
                     user_email: email,
@@ -395,10 +397,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     otp: data.code,
                     passcode: data.code,
                     message: `Voici votre code de sécurité à 6 chiffres pour ZUBIKS SERVICE : ${data.code}`
-                }).then(() => {
+                }, publicKey).then(() => {
                     console.log("EmailJS: Code à 6 chiffres transmis sur l'adresse (" + email + ") avec succès !");
                 }).catch(eErr => {
-                    console.warn("EmailJS info (vérifier Service ID / Template ID) :", eErr);
+                    console.warn("EmailJS info (vérifier Service ID / Template ID / Clé API) :", eErr);
                 });
             }
 
