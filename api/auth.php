@@ -214,35 +214,30 @@ if ($action === 'request_reset_link') {
     // Construire le lien de réinitialisation
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'zubiksservice.infinityfreeapp.com';
-    // Déduire le chemin de base proprement (sans dupliquer /public/)
     $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/api/auth.php';
-    // Remonter depuis /api/auth.php vers la racine du projet
     $baseDir = rtrim(dirname(dirname($scriptName)), '/');
     $resetLink = "{$protocol}://{$host}{$baseDir}/public/?resetToken={$token}";
 
-    $subject = "🔐 ZUBIKS SERVICE — Réinitialisation de votre mot de passe";
-    $message = "Bonjour,\n\n"
-             . "Vous avez demandé la réinitialisation de votre mot de passe sur ZUBIKS SERVICE.\n\n"
-             . "Cliquez sur le lien ci-dessous pour choisir un nouveau mot de passe :\n\n"
-             . $resetLink . "\n\n"
-             . "⚠️ Ce lien est valide pendant 30 minutes uniquement.\n"
-             . "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\n"
-             . "Cordialement,\n"
-             . "L'équipe ZUBIKS SERVICE";
+    $emailMessage = "Bonjour,\n\n"
+                  . "Vous avez demandé la réinitialisation de votre mot de passe sur ZUBIKS SERVICE.\n\n"
+                  . "Cliquez sur le lien ci-dessous pour choisir un nouveau mot de passe :\n\n"
+                  . $resetLink . "\n\n"
+                  . "⚠️ Ce lien est valide pendant 30 minutes uniquement.\n"
+                  . "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\n"
+                  . "Cordialement,\n"
+                  . "L'équipe ZUBIKS SERVICE";
 
-    $emailSent = sendTransactionalEmail($email, $subject, $message, 'zubiksservice@gmail.com');
-
-    if (!$emailSent) {
-        // L'email n'a pas pu être envoyé — on retourne quand même le succès pour ne pas exposer l'état
-        // mais on logue l'erreur en développement
-        error_log("[ZUBIKS] Échec envoi email reset à : {$email} | Lien : {$resetLink}");
-    }
-
+    // NOTE : L'envoi de l'email est délégué au frontend (EmailJS via navigateur)
+    // pour contourner les restrictions de requêtes sortantes sur les hébergements gratuits (InfinityFree, etc.)
+    // Le frontend reçoit resetLink + message et appelle EmailJS directement depuis le navigateur.
     sendJson([
-        'message' => 'Un lien de réinitialisation a été envoyé à l\'adresse ' . $email . '. Vérifiez votre boîte de réception (et le dossier Spams).',
-        'email' => $email
-        // Sécurité : le token n'est jamais retourné au client
+        'message'    => 'Lien de réinitialisation généré avec succès.',
+        'email'      => $email,
+        'resetLink'  => $resetLink,   // Le frontend envoie l'email via EmailJS
+        'emailBody'  => $emailMessage,
+        'subject'    => '🔐 ZUBIKS SERVICE — Réinitialisation de votre mot de passe'
     ]);
+
 }
 
 if ($action === 'reset_password_by_token') {

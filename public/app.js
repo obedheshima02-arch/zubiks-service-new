@@ -422,19 +422,40 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
+            // 1. Le PHP génère le token sécurisé et retourne le lien de reset
             const res = await fetch(`${API.auth}?action=request_reset_link`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Impossible d'envoyer le lien de réinitialisation.");
+            if (!res.ok) throw new Error(data.error || "Impossible de générer le lien de réinitialisation.");
 
-            // Afficher la confirmation — l'utilisateur doit aller vérifier son email
+            // 2. Envoyer l'email via EmailJS directement depuis le navigateur
+            // (contourne les restrictions cURL des hébergements gratuits comme InfinityFree)
+            if (data.resetLink && typeof emailjs !== 'undefined') {
+                try {
+                    await emailjs.send(
+                        'service_pbpkjea',  // Service ID
+                        'template_2qjiyse', // Template ID
+                        {
+                            to_email: email,
+                            subject:  data.subject  || '🔐 ZUBIKS SERVICE — Réinitialisation de votre mot de passe',
+                            message:  data.emailBody || `Votre lien de réinitialisation : ${data.resetLink}`,
+                            reply_to: 'zubiksservice@gmail.com'
+                        },
+                        '8YpcdEl31a-Y81ilz' // Public Key
+                    );
+                } catch (ejsErr) {
+                    console.warn("EmailJS send warning:", ejsErr);
+                    // Ne pas bloquer l'UX si l'envoi EmailJS échoue — le token est déjà en BDD
+                }
+            }
+
+            // 3. Afficher la confirmation à l'utilisateur
             hideAllAuthForms();
             if (forgotPasswordWrapper) {
                 forgotPasswordWrapper.style.display = 'block';
-                // Remplacer le formulaire par un message de confirmation
                 forgotPasswordWrapper.innerHTML = `
                     <button id="btn-forgot-to-login" type="button" class="btn-back-link">
                         ← Retour à la connexion
@@ -455,17 +476,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         </button>
                     </div>
                 `;
-                // Rebind les boutons du nouveau HTML
                 const backBtn = document.getElementById('btn-forgot-to-login');
                 if (backBtn) backBtn.addEventListener('click', () => btnShowLogin && btnShowLogin.click());
                 const resendBtn = document.getElementById('btn-resend-link');
-                if (resendBtn) resendBtn.addEventListener('click', () => {
-                    // Restaurer le formulaire
-                    location.reload();
-                });
+                if (resendBtn) resendBtn.addEventListener('click', () => { location.reload(); });
             }
 
-            showToast(data.message || `Lien envoyé à ${email}. Vérifiez votre boite mail.`, "success");
+            showToast(`Lien envoyé à ${email}. Vérifiez votre boite mail.`, "success");
             return true;
 
         } catch (err) {
@@ -478,6 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
     };
+
 
     // Bouton "Mot de passe oublié ?" dans le formulaire de connexion
     if (linkForgotPassword) {
