@@ -278,33 +278,27 @@
                             </div>
                         </div>
                         <button type="submit" class="btn-primary btn-forgot-submit">
-                            <span>Recevoir le code de vérification</span>
+                            <span>Recevoir le lien de réinitialisation</span>
                             <span class="arrow">→</span>
                         </button>
                         <p class="text-muted text-center mt-10" style="font-size: 0.82rem; line-height: 1.4;">
-                            💡 Un code de vérification à 6 chiffres sera envoyé à cette adresse email pour sécuriser votre compte.
+                            📧 Un lien sécurisé valable <strong>30 minutes</strong> sera envoyé sur cette adresse email.
                         </p>
                     </form>
                 </div>
 
-                <!-- Formulaire Réinitialisation du mot de passe -->
                 <div id="reset-password-wrapper" style="display: none;">
                     <button id="btn-reset-to-login" type="button" class="btn-back-link">
                         ← Annuler et se connecter
                     </button>
                     <form id="reset-password-form">
+                        <!-- Token caché : rempli automatiquement depuis le lien ?resetToken= de l'URL -->
                         <input type="hidden" id="reset-token-input">
-                        <div class="input-group">
-                            <label for="reset-otp-code">Code de vérification (6 chiffres)</label>
-                            <div class="input-with-icon">
-                                <span class="input-icon">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                                    </svg>
-                                </span>
-                                <input type="text" id="reset-otp-code" placeholder="Ex: 184920" maxlength="6" inputmode="numeric" required style="letter-spacing: 2px; font-weight: bold; text-align: center;">
-                            </div>
+                        <div style="text-align: center; margin-bottom: 16px;">
+                            <div style="font-size: 2rem; margin-bottom: 8px;">🔐</div>
+                            <p style="font-size: 0.88rem; color: #4a5568; line-height: 1.4;">
+                                Choisissez votre <strong>nouveau mot de passe</strong> ci-dessous.
+                            </p>
                         </div>
                         <div class="input-group">
                             <label for="reset-new-password">Nouveau mot de passe</label>
@@ -412,7 +406,10 @@
                     </button>
                 </div>
             </nav>
-            <div class="sidebar-footer">
+            <div class="sidebar-footer" style="display: flex; flex-direction: column; gap: 8px;">
+                <button id="btn-install-pwa-sidebar" class="btn-install-pwa-sidebar" type="button" style="display: none;">
+                    📲 Installer L'application
+                </button>
                 <button id="logout-btn" class="btn-logout"
                     style="display: flex; align-items: center; justify-content: center; gap: 6px;">🚪 Se
                     déconnecter</button>
@@ -472,6 +469,11 @@
                             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                         </svg>
                         <span id="top-notif-badge" class="badge" style="display: none; position: absolute; top: -5px; right: -5px; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; align-items: center; justify-content: center; padding: 0; background-color: #ef4444; color: white;"></span>
+                    </button>
+
+                    <!-- Bouton Installer App PWA -->
+                    <button id="btn-install-pwa" class="btn-install-pwa-nav" type="button" style="display: none;" title="Installer l'application sur votre écran d'accueil">
+                        <span>📲 Installer App</span>
                     </button>
 
                     <!-- Icône Thème -->
@@ -942,62 +944,88 @@
 
                 <!-- Tab Messagerie Admin -->
                 <div id="tab-messagerie-admin" class="tab-pane fade-in">
-                    <div class="panel glass-panel" style="padding: 0; overflow: hidden;">
-                        <div class="admin-chat-grid">
-                            <!-- Conversations List Sidebar -->
-                            <div class="chat-threads-panel"
-                                style="border-right: 1px solid #e2e8f0; background: #f8fafc; padding: 15px; display: flex; flex-direction: column;">
-                                <h4 style="margin-bottom: 12px; color: var(--primary-color);">💬 Conversations Client
-                                </h4>
-                                <button id="btn-broadcast-message" class="btn-warning w-100" type="button"
-                                    style="font-size: 0.85rem; padding: 10px; margin-bottom: 12px; border-radius: 8px;">📢
-                                    Envoyer une annonce à tous</button>
-                                <input type="text" id="search-chat-member" placeholder="Rechercher un membre..."
-                                    style="padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; margin-bottom: 12px;">
-                                <div id="admin-chat-threads"
-                                    style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
-                                    <!-- Injected threads -->
+                    <div class="admin-messaging-wrapper">
+                        <!-- Top Header Bar for Admin Messaging -->
+                        <div class="admin-chat-topbar">
+                            <div class="admin-chat-topbar-info">
+                                <div class="admin-chat-icon-badge">💬</div>
+                                <div>
+                                    <h3 class="admin-chat-title">Messagerie Client & Annonces</h3>
+                                    <p class="admin-chat-subtitle">Discutez en direct avec vos membres ou diffusez une communication officielle.</p>
                                 </div>
                             </div>
-                            <!-- Active Chat Box -->
-                            <div class="chat-active-panel"
-                                style="display: flex; flex-direction: column; background: white;">
-                                <div
-                                    style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; background: #f7fafc; display: flex; align-items: center; justify-content: space-between;">
-                                    <div style="display: flex; align-items: center; gap: 10px;">
-                                        <button id="admin-chat-mobile-back" type="button" class="btn-chat-back"
-                                            style="display: none; background: #edf2f7; border: 1px solid #cbd5e0; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">←
-                                            Liste</button>
-                                        <div>
-                                            <h4 id="admin-chat-header-name" style="margin: 0; color: #2d3748;">
-                                                Sélectionnez un membre</h4>
-                                            <small id="admin-chat-header-info" class="text-muted"
-                                                style="font-size: 0.8rem;">Cliquez sur un membre pour lire et
-                                                répondre.</small>
+                            <button id="btn-top-broadcast" class="btn-broadcast-main btn-open-broadcast-modal" type="button">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                                </svg>
+                                <span>📢 Diffuser une Annonce</span>
+                            </button>
+                        </div>
+
+                        <!-- Main Chat Grid Panel -->
+                        <div class="panel glass-panel admin-chat-panel-container">
+                            <div class="admin-chat-grid">
+                                <!-- Conversations List Sidebar -->
+                                <div class="chat-threads-panel">
+                                    <div class="threads-header">
+                                        <div class="threads-header-title">
+                                            <h4>Conversations</h4>
+                                            <span id="chat-members-count-badge" class="badge-count">0</span>
                                         </div>
-                                    </div>
-                                </div>
-                                <div id="admin-chat-messages"
-                                    style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #f8fafc; max-height: 380px;">
-                                    <div class="text-center text-muted" style="margin-top: 60px;">👈 Sélectionnez une
-                                        conversation dans la liste de gauche pour afficher les messages.</div>
-                                </div>
-                                <form id="admin-chat-form" class="chat-input-bar">
-                                    <div class="chat-input-wrapper">
-                                        <textarea id="admin-chat-input" class="chat-input-field" rows="1"
-                                            placeholder="Écrivez votre réponse..." disabled
-                                            autocomplete="off"></textarea>
-                                        <button type="submit" id="admin-chat-send-btn" class="chat-send-btn" disabled>
-                                            <span>Répondre</span>
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                                                stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                                stroke-linejoin="round">
-                                                <line x1="22" y1="2" x2="11" y2="13"></line>
-                                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                                            </svg>
+                                        <button id="btn-broadcast-message" class="btn-broadcast-sidebar btn-open-broadcast-modal" type="button">
+                                            📢 Envoyer une annonce à tous
                                         </button>
                                     </div>
-                                </form>
+                                    <div class="chat-search-box">
+                                        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="11" cy="11" r="8"></circle>
+                                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                        </svg>
+                                        <input type="text" id="search-chat-member" placeholder="Rechercher un membre..." autocomplete="off">
+                                    </div>
+                                    <div id="admin-chat-threads" class="chat-threads-list">
+                                        <!-- Injected threads -->
+                                    </div>
+                                </div>
+
+                                <!-- Active Chat Box -->
+                                <div class="chat-active-panel">
+                                    <div class="chat-active-header">
+                                        <button id="admin-chat-mobile-back" type="button" class="btn-chat-back" title="Retour à la liste">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                                <polyline points="12 19 5 12 12 5"></polyline>
+                                            </svg>
+                                            <span>Retour</span>
+                                        </button>
+                                        <div class="chat-active-user-info">
+                                            <div id="admin-chat-header-avatar" class="chat-header-avatar">👤</div>
+                                            <div>
+                                                <h4 id="admin-chat-header-name">Sélectionnez un membre</h4>
+                                                <small id="admin-chat-header-info" class="text-muted">Cliquez sur un membre pour lire et répondre.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div id="admin-chat-messages" class="chat-messages-body">
+                                        <div class="empty-chat-placeholder">
+                                            <div class="empty-chat-icon">💬</div>
+                                            <p>Sélectionnez une conversation dans la liste pour afficher les messages.</p>
+                                        </div>
+                                    </div>
+                                    <form id="admin-chat-form" class="chat-input-bar">
+                                        <div class="chat-input-wrapper">
+                                            <textarea id="admin-chat-input" class="chat-input-field" rows="1" placeholder="Écrivez votre réponse..." disabled autocomplete="off"></textarea>
+                                            <button type="submit" id="admin-chat-send-btn" class="chat-send-btn" disabled>
+                                                <span>Répondre</span>
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1709,7 +1737,69 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=8"></script>
+    <!-- PWA Install Banner (PC, Android, iOS) -->
+    <div id="pwa-install-banner" class="pwa-banner" style="display: none;">
+        <div class="pwa-banner-content">
+            <div class="pwa-icon-wrapper">
+                <img src="icon-512.png" alt="Zubiks App Icon" class="pwa-app-icon">
+            </div>
+            <div class="pwa-text-group">
+                <strong class="pwa-banner-title">📲 Installer ZUBIKS SERVICE</strong>
+                <p class="pwa-banner-desc">Ajoutez l'icône sur votre écran d'accueil PC, Android ou iPhone pour l'utiliser comme une vraie application mobile.</p>
+            </div>
+            <div class="pwa-banner-actions">
+                <button id="pwa-dismiss-btn" class="btn-pwa-later" type="button">Plus tard</button>
+                <button id="pwa-accept-btn" class="btn-pwa-install" type="button">📲 Installer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal d'Instructions d'Installation iOS / iPhone -->
+    <div id="pwa-ios-modal" class="modal" style="display: none;">
+        <div class="modal-content glass-panel" style="max-width: 460px; border-radius: 20px; padding: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(226, 232, 240, 0.8); padding-bottom: 14px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <img src="icon-512.png" alt="Zubiks" style="width: 44px; height: 44px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a; font-weight: 700;">Installer sur iPhone / iPad</h3>
+                        <small class="text-muted" style="font-size: 0.82rem;">Ajouter l'icône ZUBIKS à l'écran d'accueil Safari</small>
+                    </div>
+                </div>
+                <span class="close-modal" id="close-ios-pwa-modal">&times;</span>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px;">
+                <div class="ios-step-card">
+                    <div class="ios-step-number">1</div>
+                    <div class="ios-step-text">
+                        Appuyez sur le bouton <strong>Partager</strong>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#007aff" stroke-width="2.2" style="vertical-align: middle; margin: 0 2px;">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                            <polyline points="16 6 12 2 8 6"></polyline>
+                            <line x1="12" y1="2" x2="12" y2="15"></line>
+                        </svg>
+                        dans la barre d'outils du bas de Safari.
+                    </div>
+                </div>
+                <div class="ios-step-card">
+                    <div class="ios-step-number">2</div>
+                    <div class="ios-step-text">
+                        Faites défiler les options et sélectionnez <strong>"Sur l'écran d'accueil"</strong> (➕).
+                    </div>
+                </div>
+                <div class="ios-step-card">
+                    <div class="ios-step-number">3</div>
+                    <div class="ios-step-text">
+                        Appuyez sur <strong>"Ajouter"</strong> en haut à droite pour placer l'icône de l'application sur votre iPhone.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 20px; padding-top: 14px; border-top: 1px solid rgba(226, 232, 240, 0.8);">
+                <button type="button" id="btn-close-ios-guide" class="btn-primary" style="width: 100%; border-radius: 12px; font-weight: 600; padding: 12px; font-size: 0.95rem;">Compris !</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
     <!-- Enregistrement Service Worker PWA -->

@@ -82,3 +82,15 @@ CREATE TABLE IF NOT EXISTS `messages` (
     `readByAdmin` TINYINT(1) DEFAULT 0,
     `readByUser` TINYINT(1) DEFAULT 0
 );
+
+-- Table Réinitialisation de Mot de Passe (Lien sécurisé par email)
+CREATE TABLE IF NOT EXISTS `password_resets` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `email` VARCHAR(255) NOT NULL,
+    `token` VARCHAR(128) NOT NULL UNIQUE,
+    `expires_at` DATETIME NOT NULL,
+    `used` TINYINT(1) DEFAULT 0,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_token` (`token`),
+    INDEX `idx_email` (`email`)
+);

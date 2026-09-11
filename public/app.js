@@ -316,13 +316,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Setup Auto Refresh / Polling (intervalle augmenté à 12s pour réduire la charge serveur)
+    // Setup Auto Refresh / Polling (intervalle augmenté à 20s pour réduire la charge serveur)
     let syncInterval = null;
     const setupListeners = () => {
         if (!syncInterval) {
             syncInterval = setInterval(() => {
                 loadState();
-            }, 12000); // 12 secondes au lieu de 5 : moins de charge, toujours temps réel
+            }, 20000); // 20s : moins de charge serveur, toujours quasi-temps réel
         }
     };
 
@@ -690,6 +690,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Feedback visuel immédiat sur le bouton
+        const loginBtn = loginForm.querySelector('button[type="submit"]');
+        const originalBtnText = loginBtn ? loginBtn.innerHTML : '';
+        if (loginBtn) {
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<span>⏳ Connexion...</span>';
+        }
+
         try {
             const res = await fetch(`${API.auth}?action=login`, {
                 method: 'POST',
@@ -702,17 +710,27 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUser = data.user;
             saveActiveSession(currentUser);
 
-            await loadState();
+            // Afficher le dashboard IMMÉDIATEMENT (sans attendre loadState)
             switchRoleView();
             loginScreen.classList.remove('active');
             dashboardScreen.classList.add('active');
             updateDates();
-            renderAll();
-            requestNotificationPermission();
             showToast(`Connexion réussie (${currentUser.role === 'admin' ? 'Administrateur' : currentUser.nom})`, 'success');
+            requestNotificationPermission();
+
+            // Charger les données en arrière-plan (non bloquant)
+            loadState().then(() => {
+                renderAll();
+                setupListeners(); // Démarrer le polling seulement après le 1er chargement réussi
+            });
+
         } catch (err) {
             console.error("Erreur de connexion Backend :", err);
             showToast(err.message || 'Email ou mot de passe incorrect.', 'error');
+            if (loginBtn) {
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = originalBtnText;
+            }
         }
     });
 
@@ -1253,6 +1271,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return [];
     };
 
+    // --- Anti-flickering : cache de hash pour éviter les re-renders inutiles ---
+    // Chaque clé correspond à un bloc de données ; la valeur est le JSON stringifié du dernier rendu.
+    // Si les données n'ont pas changé depuis le dernier cycle, le bloc est ignoré.
+    const _renderCache = {};
+    const _hasChanged = (key, data) => {
+        const serialized = JSON.stringify(data);
+        if (_renderCache[key] === serialized) return false;
+        _renderCache[key] = serialized;
+        return true;
+    };
+
     const renderAll = () => {
         const memberSearchTerm = (searchMemberInput ? searchMemberInput.value.toLowerCase() : '');
         const depotSearchTerm = (searchDepotInput ? searchDepotInput.value.toLowerCase() : '');
@@ -1321,6 +1350,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pendingPanel && pendingTableBody) {
             if (pendingMembers.length > 0) {
                 pendingPanel.style.display = 'block';
+                if (_hasChanged('pending', pendingMembers)) {
                 pendingTableBody.innerHTML = '';
                 pendingMembers.forEach((m, idx) => {
                     const tr = document.createElement('tr');
@@ -1343,6 +1373,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     `;
                     pendingTableBody.appendChild(tr);
                 });
+                } // end _hasChanged pending
             } else {
                 pendingPanel.style.display = 'none';
             }
@@ -1356,6 +1387,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Render Members Table (tab-membres)
         if (membersTableBody) {
+            if (_hasChanged('members', sortedMembers)) {
             membersTableBody.innerHTML = '';
             sortedMembers.filter(m => (m.nom || '').toLowerCase().includes(memberSearchTerm)).forEach((member, index) => {
                 const tr = document.createElement('tr');
@@ -1375,10 +1407,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 membersTableBody.appendChild(tr);
             });
+            } // end _hasChanged members
         }
 
         // Render Depots Table
         if (depotsTableBody) {
+            if (_hasChanged('depots', sortedMembers)) {
             depotsTableBody.innerHTML = '';
             sortedMembers.filter(m => (m.nom || '').toLowerCase().includes(depotSearchTerm)).forEach((member, index) => {
                 const depot = member.totalDepot || 0;
@@ -1393,10 +1427,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 depotsTableBody.appendChild(tr);
             });
+            } // end _hasChanged depots
         }
 
         // Render Retraits Table
         if (retraitsTableBody) {
+            if (_hasChanged('retraits', sortedMembers)) {
             retraitsTableBody.innerHTML = '';
             sortedMembers.filter(m => (m.nom || '').toLowerCase().includes(retraitSearchTerm)).forEach((member, index) => {
                 const depot = member.totalDepot || 0;
@@ -1413,10 +1449,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 retraitsTableBody.appendChild(tr);
             });
+            } // end _hasChanged retraits
         }
 
         // Render Transactions Table & Global Totals
-        if (transactionsTableBody) {
+        if (transactionsTableBody && _hasChanged('transactions', state.transactions)) {
             transactionsTableBody.innerHTML = '';
             let filteredTx = state.transactions || [];
 

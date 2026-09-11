@@ -12,7 +12,8 @@ $action = $_GET['action'] ?? ($input['action'] ?? '');
 
 // GET: Récupérer les stats globales et archives
 if ($method === 'GET') {
-    recalculateTotals($pdo);
+    // recalculateTotals() N'EST PAS appelée ici pour éviter N×2 requêtes SQL à chaque polling.
+    // Elle est appelée uniquement après les opérations (dépôt/retrait) via transactions.php.
 
     $stmtStats = $pdo->query("SELECT * FROM global_stats WHERE id = 1");
     $stats = $stmtStats->fetch() ?: [

@@ -154,7 +154,9 @@ if ($method === 'POST') {
 
         $pdo->commit();
 
-        recalculateTotals($pdo);
+        // Note : recalculateTotals() n'est pas nécessaire ici car les totaux membres
+        // (totalDepot/totalRetrait) et global_stats sont déjà mis à jour atomiquement
+        // dans la transaction ci-dessus via UPDATE ... SET totalDepot = totalDepot + ?
 
         sendJson([
             'id' => $txId,

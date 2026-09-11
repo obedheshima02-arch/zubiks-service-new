@@ -54,6 +54,44 @@ if ($method === 'POST') {
         }
     }
 
+    if ($action === 'broadcast') {
+        $text = trim($input['text'] ?? '');
+        $senderName = $input['senderName'] ?? 'Administration';
+        if (empty($text)) {
+            sendJson(['error' => 'Le contenu de l\'annonce est vide.'], 400);
+        }
+
+        $stmtM = $pdo->query("SELECT id FROM members WHERE (status = 'active' OR status IS NULL OR status != 'pending') AND (role IS NULL OR role NOT IN ('admin', 'admin_second'))");
+        $members = $stmtM->fetchAll();
+
+        if (empty($members)) {
+            sendJson(['error' => 'Aucun membre actif trouvé.'], 400);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $count = 0;
+
+        $pdo->beginTransaction();
+        try {
+            $stmtIns = $pdo->prepare("
+                INSERT INTO messages (id, memberId, sender, senderName, text, timestamp, readByAdmin, readByUser)
+                VALUES (?, ?, 'admin', ?, ?, ?, 1, 0)
+            ");
+            foreach ($members as $m) {
+                $msgId = 'msg_' . time() . '_' . rand(100, 999) . '_' . rand(10, 99);
+                $stmtIns->execute([$msgId, $m['id'], $senderName, $text, $now]);
+                $count++;
+            }
+            $pdo->commit();
+            sendJson(['message' => "Annonce diffusée à $count membre(s).", 'count' => $count]);
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            sendJson(['error' => 'Erreur lors de la diffusion : ' . $e->getMessage()], 500);
+        }
+    }
+
     $memberId = $input['memberId'] ?? '';
     $sender = $input['sender'] ?? 'user';
     $senderName = $input['senderName'] ?? '';

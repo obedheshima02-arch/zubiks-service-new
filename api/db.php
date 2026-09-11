@@ -50,11 +50,14 @@ try {
     exit();
 }
 
-// Config e-mail transactionnel (Optionnel : Clé API Brevo gratuite si mail() PHP est bloqué par l'hébergeur)
-$BREVO_API_KEY = getenv('BREVO_API_KEY') ?: '';
+// Config e-mail transactionnel via EmailJS (remplace Brevo)
+$EMAILJS_SERVICE_ID  = getenv('EMAILJS_SERVICE_ID')  ?: 'service_pbpkjea';
+$EMAILJS_TEMPLATE_ID = getenv('EMAILJS_TEMPLATE_ID') ?: 'template_2qjiyse';  // "Réponse automatique"
+$EMAILJS_PUBLIC_KEY  = getenv('EMAILJS_PUBLIC_KEY')  ?: '8YpcdEl31a-Y81ilz';
+$EMAILJS_PRIVATE_KEY = getenv('EMAILJS_PRIVATE_KEY') ?: 'nGriDoJ_z-KnFTP9pXP85';
 
 function sendTransactionalEmail($to, $subject, $messageText, $replyTo = 'zubiksservice@gmail.com') {
-    global $BREVO_API_KEY;
+    global $EMAILJS_SERVICE_ID, $EMAILJS_TEMPLATE_ID, $EMAILJS_PUBLIC_KEY, $EMAILJS_PRIVATE_KEY;
     if (empty($to)) return false;
 
     $sent = false;
@@ -69,36 +72,38 @@ function sendTransactionalEmail($to, $subject, $messageText, $replyTo = 'zubikss
     $mailResult = @mail($to, $subject, $messageText, $headers);
     if ($mailResult) $sent = true;
 
-    // 2. Si clé API Brevo configurée : envoi HTTPS garanti avec basculement d'expéditeur validé
-    if (!empty($BREVO_API_KEY)) {
-        $senders = ["zubiksservice@gmail.com", "obedheshima02@gmail.com"];
-        foreach ($senders as $senderEmail) {
-            $payload = json_encode([
-                "sender" => ["name" => "ZUBIKS SERVICE", "email" => $senderEmail],
-                "to" => [["email" => $to]],
+    // 2. Si EmailJS est configuré : envoi via l'API REST EmailJS
+    if (!empty($EMAILJS_SERVICE_ID) && $EMAILJS_SERVICE_ID !== 'YOUR_SERVICE_ID') {
+        $payload = json_encode([
+            "service_id" => $EMAILJS_SERVICE_ID,
+            "template_id" => $EMAILJS_TEMPLATE_ID,
+            "user_id" => $EMAILJS_PUBLIC_KEY,
+            "accessToken" => $EMAILJS_PRIVATE_KEY,
+            "template_params" => [
+                "to_email" => $to,
                 "subject" => $subject,
-                "textContent" => $messageText
-            ], JSON_UNESCAPED_UNICODE);
+                "message" => $messageText,
+                "reply_to" => $replyTo
+            ]
+        ], JSON_UNESCAPED_UNICODE);
 
-            if (function_exists('curl_init')) {
-                $ch = curl_init("https://api.brevo.com/v3/smtp/email");
-                curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                    "api-key: " . $BREVO_API_KEY,
-                    "Content-Type: application/json",
-                    "Accept: application/json"
-                ]);
-                curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-                $res = @curl_exec($ch);
-                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
+        if (function_exists('curl_init')) {
+            $ch = curl_init("https://api.emailjs.com/api/v1.0/email/send");
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Content-Type: application/json",
+                "Accept: application/json"
+            ]);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5);        // Max 5s pour la requête complète
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3); // Max 3s pour l'établissement de connexion
+            $res = @curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
 
-                if ($code >= 200 && $code < 300) {
-                    $sent = true;
-                    break;
-                }
+            if ($code >= 200 && $code < 300) {
+                $sent = true;
             }
         }
     }

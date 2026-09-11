@@ -24,11 +24,11 @@ if ($method === 'GET') {
             sendJson(['error' => 'Membre introuvable.'], 404);
         }
     } else {
-        $stmt = $pdo->query("SELECT id, nom, postnom, sexe, email, role, status, parts, totalDepot, totalRetrait, dateAjout, profilePhoto, notifications FROM members ORDER BY nom ASC");
+        // Optimisation : ne pas appeler syncMemberTransactionNotifs() en boucle ici
+        // (causerait N requêtes SQL supplémentaires à chaque polling de 12s)
+        // La sync se fait uniquement au login (auth.php) et lors des transactions.
+        $stmt = $pdo->query("SELECT id, nom, postnom, sexe, email, role, status, parts, totalDepot, totalRetrait, dateAjout, profilePhoto, notifications FROM members ORDER BY dateAjout ASC");
         $members = $stmt->fetchAll();
-        foreach ($members as &$m) {
-            syncMemberTransactionNotifs($pdo, $m);
-        }
         sendJson($members);
     }
 }
@@ -107,6 +107,18 @@ if ($method === 'POST') {
         $stmt = $pdo->prepare("UPDATE members SET profilePhoto = ? WHERE id = ?");
         $stmt->execute([$profilePhoto, $id]);
         sendJson(['message' => 'Photo de profil mise à jour.']);
+    }
+
+    if ($action === 'reset_password') {
+        $id = $input['id'] ?? '';
+        $newPassword = trim($input['newPassword'] ?? '123456');
+        if (empty($id)) {
+            sendJson(['error' => 'ID du membre requis.'], 400);
+        }
+        $hash = password_hash($newPassword, PASSWORD_BCRYPT);
+        $stmt = $pdo->prepare("UPDATE members SET password = ? WHERE id = ?");
+        $stmt->execute([$hash, $id]);
+        sendJson(['message' => "Mot de passe du membre réinitialisé avec succès (Nouveau MDP: $newPassword)."]);
     }
 
     if ($action === 'update_notifs' || $action === 'mark_read') {
