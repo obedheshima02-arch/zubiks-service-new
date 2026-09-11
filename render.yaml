@@ -1,0 +1,36 @@
+# render.yaml — Configuration Render pour ZUBIKS SERVICE
+# Documentation : https://render.com/docs/render-yaml
+
+services:
+  - type: web
+    name: zubiks-service
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    autoDeploy: true   # Déploiement automatique à chaque push GitHub
+
+    # Variables d'environnement — à renseigner dans le dashboard Render
+    envVars:
+      - key: DB_HOST
+        sync: false    # À renseigner manuellement dans Render Dashboard
+
+      - key: DB_NAME
+        sync: false
+
+      - key: DB_USER
+        sync: false
+
+      - key: DB_PASSWORD
+        sync: false
+
+      - key: EMAILJS_SERVICE_ID
+        value: service_pbpkjea
+
+      - key: EMAILJS_TEMPLATE_ID
+        value: template_2qjiyse
+
+      - key: EMAILJS_PUBLIC_KEY
+        value: 8YpcdEl31a-Y81ilz
+
+      - key: EMAILJS_PRIVATE_KEY
+        sync: false    # À renseigner manuellement (clé privée EmailJS)
