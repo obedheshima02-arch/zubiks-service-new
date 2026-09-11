@@ -1,4 +1,4 @@
-﻿// =====================================================
+// =====================================================
 // FONCTION TOAST GLOBALE — disponible avant DOMContentLoaded
 // =====================================================
 function showToast(message, type = 'success') {
@@ -151,8 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Firebase Service (remplace toutes les API PHP)
     const { authService, membersService, transactionsService, messagesService, statsService } = window.FirebaseService;
 
-    // S'assurer que global_stats/main existe
-    statsService.ensureExists().catch(e => console.warn('[Stats] ensureExists:', e));
+
 
     let previousNotifIds = null;
 
@@ -629,6 +628,9 @@ document.addEventListener('DOMContentLoaded', () => {
             updateDates();
             showToast(`Connexion réussie (${currentUser.role === 'admin' ? 'Administrateur' : currentUser.nom})`, 'success');
             requestNotificationPermission();
+
+            // Initialiser les stats globales si premier admin
+            statsService.ensureExists().catch(e => console.warn('[Stats] ensureExists:', e));
 
             // Démarrer les listeners temps réel Firebase (remplace le polling)
             teardownRealtimeListeners();
