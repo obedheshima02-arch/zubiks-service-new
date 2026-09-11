@@ -14,10 +14,28 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 // Fuseau horaire officiel pour Goma (Nord-Kivu, RDC - UTC+2 / CAT)
 date_default_timezone_set('Africa/Lubumbashi');
 
-$host = 'localhost';
-$dbname = 'zubiks_db';
-$username = 'root';
-$password = ''; // Par défaut vide sur Laragon / XAMPP
+// Détection automatique de l'environnement (Local Laragon vs Hébergement InfinityFree)
+$httpHost = $_SERVER['HTTP_HOST'] ?? '';
+$isInfinityFree = (strpos($httpHost, 'infinityfreeapp.com') !== false || strpos($httpHost, 'infinityfree.com') !== false || strpos($httpHost, 'epizy.com') !== false);
+
+if (getenv('DB_HOST')) {
+    $host     = getenv('DB_HOST');
+    $dbname   = getenv('DB_NAME');
+    $username = getenv('DB_USER');
+    $password = getenv('DB_PASSWORD');
+} elseif ($isInfinityFree) {
+    // Identifiants MySQL officiels pour votre hébergement InfinityFree
+    $host     = getenv('DB_HOST')     ?: 'sql111.infinityfree.com';
+    $dbname   = getenv('DB_NAME')     ?: 'if0_42877205_zubiks';
+    $username = getenv('DB_USER')     ?: 'if0_42877205';
+    $password = getenv('DB_PASSWORD') ?: 'obediheshima';
+} else {
+    // Identifiants par défaut pour le développement local (Laragon / XAMPP / WAMP)
+    $host     = 'localhost';
+    $dbname   = 'zubiks_db';
+    $username = 'root';
+    $password = '';
+}
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password, [
@@ -39,6 +57,8 @@ function sendTransactionalEmail($to, $subject, $messageText, $replyTo = 'zubikss
     global $BREVO_API_KEY;
     if (empty($to)) return false;
 
+    $sent = false;
+
     // 1. Envoi par mail() PHP natif
     $domain = $_SERVER['HTTP_HOST'] ?? 'zubiksservice.infinityfreeapp.com';
     $headers = "From: ZUBIKS SERVICE <no-reply@{$domain}>\r\n"
@@ -46,7 +66,8 @@ function sendTransactionalEmail($to, $subject, $messageText, $replyTo = 'zubikss
              . "X-Mailer: PHP/" . phpversion() . "\r\n"
              . "MIME-Version: 1.0\r\n"
              . "Content-Type: text/plain; charset=UTF-8\r\n";
-    @mail($to, $subject, $messageText, $headers);
+    $mailResult = @mail($to, $subject, $messageText, $headers);
+    if ($mailResult) $sent = true;
 
     // 2. Si clé API Brevo configurée : envoi HTTPS garanti avec basculement d'expéditeur validé
     if (!empty($BREVO_API_KEY)) {
@@ -69,18 +90,19 @@ function sendTransactionalEmail($to, $subject, $messageText, $replyTo = 'zubikss
                 curl_setopt($ch, CURLOPT_POST, true);
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
                 $res = @curl_exec($ch);
                 $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 curl_close($ch);
 
                 if ($code >= 200 && $code < 300) {
+                    $sent = true;
                     break;
                 }
             }
         }
     }
-    return true;
+    return $sent;
 }
 
 function sendJson($data, $statusCode = 200) {
@@ -107,6 +129,13 @@ function parseJsonField($val) {
 
 function syncMemberTransactionNotifs($pdo, &$member) {
     if (empty($member['id'])) return;
+
+    // Cache court : si synché il y a moins de 10s pour ce membre, on saute (optimisation perf.)
+    $cacheKey = 'sync_notif_' . $member['id'];
+    if (isset($_SESSION[$cacheKey]) && (time() - $_SESSION[$cacheKey]) < 10) {
+        return; // Données encore fraîches, pas de requête SQL nécessaire
+    }
+
     $currentNotifs = parseJsonField($member['notifications'] ?? '');
     $memberName = trim($member['nom'] ?? '');
     $stmtTx = $pdo->prepare("SELECT id, type, amount, date, timestamp FROM transactions WHERE TRIM(memberId) = TRIM(?) OR (LOWER(memberNom) = LOWER(?) AND memberNom != '') ORDER BY timestamp ASC");
@@ -115,6 +144,7 @@ function syncMemberTransactionNotifs($pdo, &$member) {
 
     if (empty($txs)) {
         $member['notifications'] = $currentNotifs;
+        $_SESSION[$cacheKey] = time();
         return;
     }
 
@@ -164,6 +194,7 @@ function syncMemberTransactionNotifs($pdo, &$member) {
         $stmtU->execute([$cleanJson, $member['id']]);
     }
 
+    $_SESSION[$cacheKey] = time(); // Marquer comme synchronisé
     $member['notifications'] = $currentNotifs;
 }
 

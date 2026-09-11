@@ -163,10 +163,9 @@ if ($action === 'change_password' || $action === 'update_password') {
     sendJson(['error' => 'Utilisateur ou compte introuvable.'], 404);
 }
 
-if ($action === 'reset_password' || $action === 'send_reset_code') {
+if ($action === 'request_reset_link') {
+    // ÉTAPE 1 : Générer un token sécurisé et envoyer le lien par email
     $email = strtolower(trim($input['email'] ?? ''));
-    $code = trim($input['code'] ?? ($input['otp'] ?? ''));
-    $newPassword = $input['newPassword'] ?? ($input['password'] ?? '');
 
     if (empty($email)) {
         sendJson(['error' => 'Veuillez saisir votre adresse email.'], 400);
@@ -176,63 +175,110 @@ if ($action === 'reset_password' || $action === 'send_reset_code') {
     $stats = $stmtStats->fetch();
     $adminEmail = strtolower(trim($stats['admin_email'] ?? 'zubiksservice@gmail.com'));
 
-    // ÉTAPE 1 : Si aucun nouveau mot de passe fourni -> Génération et envoi du code à 6 chiffres
-    if (empty($newPassword)) {
+    // Vérifier que l'email existe (admin ou membre)
+    $accountExists = false;
+    if ($email === $adminEmail) {
+        $accountExists = true;
+    } else {
         $stmtCheck = $pdo->prepare("SELECT id FROM members WHERE LOWER(email) = ?");
         $stmtCheck->execute([$email]);
-        $memberFound = $stmtCheck->fetch();
-
-        if ($email !== $adminEmail && !$memberFound) {
-            sendJson(['error' => 'Aucun compte n\'est enregistré avec cette adresse e-mail.'], 404);
-        }
-
-        $generatedCode = sprintf("%06d", rand(100000, 999999));
-        $_SESSION['reset_code'] = [
-            'email' => $email,
-            'code' => $generatedCode,
-            'expires' => time() + 900 // Code valide 15 minutes
-        ];
-
-        $subject = "ZUBIKS SERVICE - Code de sécurité : $generatedCode";
-        $message = "Bonjour,\n\n"
-                 . "Voici votre code de vérification à 6 chiffres pour réinitialiser votre mot de passe sur ZUBIKS SERVICE :\n\n"
-                 . "🔒 CODE DE VÉRIFICATION : " . $generatedCode . "\n\n"
-                 . "Ce code est valide pendant 15 minutes. Ne le partagez avec personne.\n"
-                 . "Si vous n'êtes pas à l'origine de cette demande, veuillez ignorer ce message.\n\n"
-                 . "Cordialement,\n"
-                 . "L'équipe ZUBIKS SERVICE";
-
-        sendTransactionalEmail($email, $subject, $message, 'zubiksservice@gmail.com');
-
-        sendJson([
-            'message' => 'Un code de vérification à 6 chiffres a été envoyé à l\'adresse ' . $email . '. Veuillez vérifier votre boîte de réception ou le dossier Spams.',
-            'email' => $email,
-            'code' => $generatedCode
-        ]);
+        $accountExists = (bool)$stmtCheck->fetch();
     }
 
-    // ÉTAPE 2 : Validation du code à 6 chiffres et mise à jour du mot de passe
-    if (empty($code)) {
-        sendJson(['error' => 'Veuillez saisir le code de vérification à 6 chiffres reçu.'], 400);
+    if (!$accountExists) {
+        sendJson(['error' => 'Aucun compte n\'est enregistré avec cette adresse e-mail.'], 404);
+    }
+
+    // Créer la table si elle n'existe pas encore (sécurité déploiement progressif)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `password_resets` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `email` VARCHAR(255) NOT NULL,
+        `token` VARCHAR(128) NOT NULL UNIQUE,
+        `expires_at` DATETIME NOT NULL,
+        `used` TINYINT(1) DEFAULT 0,
+        `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX `idx_token` (`token`),
+        INDEX `idx_email` (`email`)
+    )");
+
+    // Supprimer les anciens tokens pour cet email
+    $pdo->prepare("DELETE FROM password_resets WHERE email = ?")->execute([$email]);
+
+    // Générer un token cryptographique sécurisé (64 octets = 128 chars hexadécimaux)
+    $token = bin2hex(random_bytes(64));
+    $expiresAt = date('Y-m-d H:i:s', time() + 1800); // Valide 30 minutes
+
+    $stmtInsert = $pdo->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)");
+    $stmtInsert->execute([$email, $token, $expiresAt]);
+
+    // Construire le lien de réinitialisation
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'zubiksservice.infinityfreeapp.com';
+    // Déduire le chemin de base proprement (sans dupliquer /public/)
+    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/api/auth.php';
+    // Remonter depuis /api/auth.php vers la racine du projet
+    $baseDir = rtrim(dirname(dirname($scriptName)), '/');
+    $resetLink = "{$protocol}://{$host}{$baseDir}/public/?resetToken={$token}";
+
+    $subject = "🔐 ZUBIKS SERVICE — Réinitialisation de votre mot de passe";
+    $message = "Bonjour,\n\n"
+             . "Vous avez demandé la réinitialisation de votre mot de passe sur ZUBIKS SERVICE.\n\n"
+             . "Cliquez sur le lien ci-dessous pour choisir un nouveau mot de passe :\n\n"
+             . $resetLink . "\n\n"
+             . "⚠️ Ce lien est valide pendant 30 minutes uniquement.\n"
+             . "Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\n"
+             . "Cordialement,\n"
+             . "L'équipe ZUBIKS SERVICE";
+
+    $emailSent = sendTransactionalEmail($email, $subject, $message, 'zubiksservice@gmail.com');
+
+    if (!$emailSent) {
+        // L'email n'a pas pu être envoyé — on retourne quand même le succès pour ne pas exposer l'état
+        // mais on logue l'erreur en développement
+        error_log("[ZUBIKS] Échec envoi email reset à : {$email} | Lien : {$resetLink}");
+    }
+
+    sendJson([
+        'message' => 'Un lien de réinitialisation a été envoyé à l\'adresse ' . $email . '. Vérifiez votre boîte de réception (et le dossier Spams).',
+        'email' => $email
+        // Sécurité : le token n'est jamais retourné au client
+    ]);
+}
+
+if ($action === 'reset_password_by_token') {
+    // ÉTAPE 2 : Valider le token et enregistrer le nouveau mot de passe
+    $token = trim($input['token'] ?? '');
+    $newPassword = $input['newPassword'] ?? '';
+
+    if (empty($token)) {
+        sendJson(['error' => 'Lien de réinitialisation invalide ou manquant.'], 400);
     }
 
     if (strlen($newPassword) < 4) {
         sendJson(['error' => 'Le nouveau mot de passe doit contenir au moins 4 caractères.'], 400);
     }
 
-    $storedCode = $_SESSION['reset_code'] ?? null;
+    // Récupérer le token en base
+    $stmtToken = $pdo->prepare("SELECT * FROM password_resets WHERE token = ? AND used = 0");
+    $stmtToken->execute([$token]);
+    $resetRow = $stmtToken->fetch();
 
-    if (!$storedCode || strtolower($storedCode['email']) !== $email || $storedCode['code'] !== $code) {
-        sendJson(['error' => 'Le code de vérification à 6 chiffres est incorrect ou invalide.'], 400);
+    if (!$resetRow) {
+        sendJson(['error' => 'Ce lien de réinitialisation est invalide ou a déjà été utilisé.'], 400);
     }
 
-    if (time() > $storedCode['expires']) {
-        unset($_SESSION['reset_code']);
-        sendJson(['error' => 'Le code de vérification a expiré (valide 15 min). Veuillez demander un nouveau code.'], 400);
+    if (strtotime($resetRow['expires_at']) < time()) {
+        // Token expiré — le supprimer
+        $pdo->prepare("DELETE FROM password_resets WHERE token = ?")->execute([$token]);
+        sendJson(['error' => 'Ce lien a expiré (valable 30 min). Veuillez faire une nouvelle demande.'], 400);
     }
 
-    // Le code est correct : enregistrer le nouveau mot de passe haché en BCrypt
+    $email = strtolower(trim($resetRow['email']));
     $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
+
+    $stmtStats = $pdo->query("SELECT admin_email FROM global_stats WHERE id = 1");
+    $stats = $stmtStats->fetch();
+    $adminEmail = strtolower(trim($stats['admin_email'] ?? 'zubiksservice@gmail.com'));
 
     if ($email === $adminEmail) {
         $pdo->prepare("UPDATE global_stats SET admin_password = ? WHERE id = 1")->execute([$newHash]);
@@ -240,10 +286,49 @@ if ($action === 'reset_password' || $action === 'send_reset_code') {
         $pdo->prepare("UPDATE members SET password = ? WHERE LOWER(email) = ?")->execute([$newHash, $email]);
     }
 
-    unset($_SESSION['reset_code']);
+    // Invalider le token après usage
+    $pdo->prepare("UPDATE password_resets SET used = 1 WHERE token = ?")->execute([$token]);
 
     sendJson(['message' => 'Votre mot de passe a été réinitialisé avec succès ! Vous pouvez maintenant vous connecter.']);
 }
+
+// Conserver l'ancienne action pour compatibilité ascendante (désormais redirige vers le nouveau système)
+if ($action === 'reset_password' || $action === 'send_reset_code') {
+    $email = strtolower(trim($input['email'] ?? ''));
+    $code = trim($input['code'] ?? ($input['otp'] ?? ''));
+    $newPassword = $input['newPassword'] ?? ($input['password'] ?? '');
+
+    // Si un nouveau mot de passe + token classique sont fournis, traiter via la nouvelle méthode
+    if (!empty($newPassword) && !empty($code)) {
+        // Validation session OTP (compatibilité avec ancienne méthode)
+        $storedCode = $_SESSION['reset_code'] ?? null;
+        if (!$storedCode || strtolower($storedCode['email']) !== $email || $storedCode['code'] !== $code) {
+            sendJson(['error' => 'Code ou lien invalide. Veuillez faire une nouvelle demande.'], 400);
+        }
+        if (time() > $storedCode['expires']) {
+            unset($_SESSION['reset_code']);
+            sendJson(['error' => 'Le lien a expiré. Veuillez faire une nouvelle demande.'], 400);
+        }
+        $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
+        $stmtStats = $pdo->query("SELECT admin_email FROM global_stats WHERE id = 1");
+        $stats = $stmtStats->fetch();
+        $adminEmail = strtolower(trim($stats['admin_email'] ?? 'zubiksservice@gmail.com'));
+        if ($email === $adminEmail) {
+            $pdo->prepare("UPDATE global_stats SET admin_password = ? WHERE id = 1")->execute([$newHash]);
+        } else {
+            $pdo->prepare("UPDATE members SET password = ? WHERE LOWER(email) = ?")->execute([$newHash, $email]);
+        }
+        unset($_SESSION['reset_code']);
+        sendJson(['message' => 'Mot de passe réinitialisé avec succès.']);
+    }
+
+    // Sinon, rediriger vers la nouvelle méthode par lien email
+    $_GET['action'] = 'request_reset_link';
+    $input['email'] = $email;
+    // Pas de récursion PHP directe, mais on renvoie une indication
+    sendJson(['error' => 'Veuillez utiliser le nouveau système de réinitialisation par lien email.', 'redirect' => 'request_reset_link'], 400);
+}
+
 
 if ($action === 'register' || $action === 'signup') {
     $nom = trim($input['nom'] ?? '');

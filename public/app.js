@@ -1,3 +1,41 @@
+// =====================================================
+// FONCTION TOAST GLOBALE — disponible avant DOMContentLoaded
+// =====================================================
+function showToast(message, type = 'success') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        // Si le container n'est pas encore prêt, on réessaie après 200ms
+        setTimeout(() => showToast(message, type), 200);
+        return;
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+
+    let icon = '✅';
+    if (type === 'error') {
+        icon = '❌';
+    } else if (type === 'info') {
+        icon = 'ℹ️';
+    } else if (type === 'warning') {
+        icon = '⚠️';
+    }
+
+    // Si le message commence déjà par un emoji, ne pas ajouter d'icône en double
+    const cleanMsg = String(message || '').trim();
+    const startsWithEmoji = /^[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F680}-\u{1F6FF}]/u.test(cleanMsg);
+
+    toast.innerHTML = startsWithEmoji ? cleanMsg : `${icon} ${cleanMsg}`;
+
+    container.appendChild(toast);
+
+    // Disparaît après 2 secondes
+    setTimeout(() => {
+        toast.style.animation = 'fadeOut 0.3s ease forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, 2000);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- Theme Toggle Logic ---
     const themeToggleBtn = document.getElementById('theme-toggle');
@@ -179,10 +217,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Load State from PHP / MySQL Backend
+    let isLoadingState = false; // Evite les appels loadState() simultanés
     const loadState = async () => {
+        if (isLoadingState) return; // Ne pas lancer un 2e appel si le 1er est en cours
+        isLoadingState = true;
         try {
-            // 1. Fetch Global Stats & Regulations & Archives
-            const statsRes = await fetch(`${API.stats}`);
+            // Lancer les 4 requêtes EN PARALLÈLE (au lieu de séquentiellement)
+            // Gain : temps total = max(t1, t2, t3, t4) au lieu de t1+t2+t3+t4
+            const [statsRes, membersRes, txRes, msgRes] = await Promise.all([
+                fetch(`${API.stats}`),
+                fetch(`${API.members}`),
+                fetch(`${API.transactions}`),
+                fetch(`${API.messages}`)
+            ]);
+
+            // 1. Traiter Stats
             if (statsRes.ok) {
                 const data = await statsRes.json();
                 if (data.stats) {
@@ -218,8 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.dailyArchives = data.dailyArchives || [];
             }
 
-            // 2. Fetch Members
-            const membersRes = await fetch(`${API.members}`);
+            // 2. Traiter Membres
             if (membersRes.ok) {
                 const membersData = await membersRes.json();
                 state.members = Array.isArray(membersData) ? membersData : [];
@@ -248,15 +296,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // 3. Fetch Transactions
-            const txRes = await fetch(`${API.transactions}`);
+            // 3. Traiter Transactions
             if (txRes.ok) {
                 const txData = await txRes.json();
                 state.transactions = Array.isArray(txData) ? txData : [];
             }
 
-            // 4. Fetch Messages
-            const msgRes = await fetch(`${API.messages}`);
+            // 4. Traiter Messages
             if (msgRes.ok) {
                 const msgData = await msgRes.json();
                 state.messages = Array.isArray(msgData) ? msgData : [];
@@ -265,16 +311,18 @@ document.addEventListener('DOMContentLoaded', () => {
             renderAll();
         } catch (err) {
             console.error("Erreur de chargement API Backend :", err);
+        } finally {
+            isLoadingState = false;
         }
     };
 
-    // Setup Auto Refresh / Polling
+    // Setup Auto Refresh / Polling (intervalle augmenté à 12s pour réduire la charge serveur)
     let syncInterval = null;
     const setupListeners = () => {
         if (!syncInterval) {
             syncInterval = setInterval(() => {
                 loadState();
-            }, 5000);
+            }, 12000); // 12 secondes au lieu de 5 : moins de charge, toujours temps réel
         }
     };
 
@@ -349,10 +397,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Formulaire Mot de Passe Oublié (Forgot Password) & Envoi OTP Direct
-    let pendingResetEmail = '';
+    // =====================================================
+    // SYSTÈME DE RÉINITIALISATION PAR LIEN EMAIL SÉCURISÉ
+    // =====================================================
 
-    const requestAndSendOtp = async (targetEmail) => {
+    // Étape 1 : Demande d'envoi du lien de réinitialisation
+    const requestResetLink = async (targetEmail) => {
         const email = targetEmail ? targetEmail.trim().toLowerCase() : '';
         if (!email) {
             showToast("Veuillez saisir votre adresse email.", "error");
@@ -363,63 +413,73 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
 
+        // Afficher état de chargement
+        const submitBtn = document.querySelector('.btn-forgot-submit');
+        const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span>⏳ Envoi en cours...</span>';
+        }
+
         try {
-            const res = await fetch(`${API.auth}?action=reset_password`, {
+            const res = await fetch(`${API.auth}?action=request_reset_link`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Impossible d'envoyer le code de vérification.");
+            if (!res.ok) throw new Error(data.error || "Impossible d'envoyer le lien de réinitialisation.");
 
-            pendingResetEmail = email;
-            const forgotEmailInput = document.getElementById('forgot-email');
-            if (forgotEmailInput) forgotEmailInput.value = email;
-
-            showToast(data.message || `Code de vérification à 6 chiffres envoyé à ${email}.`, "success");
-
-            // Envoi direct du mail sur l'adresse email du destinataire via le SDK EmailJS
-            if (window.emailjs && data.code) {
-                const serviceId = window.EMAILJS_SERVICE_ID || "service_zubiks";
-                const templateId = window.EMAILJS_TEMPLATE_ID || "template_otp";
-                const publicKey = window.EMAILJS_PUBLIC_KEY || "8YpcdEI31a-Y81ilz";
-
-                emailjs.send(serviceId, templateId, {
-                    to_email: email,
-                    user_email: email,
-                    email: email,
-                    recipient_email: email,
-                    code: data.code,
-                    otp_code: data.code,
-                    otp: data.code,
-                    passcode: data.code,
-                    message: `Voici votre code de sécurité à 6 chiffres pour ZUBIKS SERVICE : ${data.code}`
-                }, publicKey).then(() => {
-                    console.log("EmailJS: Code à 6 chiffres transmis sur l'adresse (" + email + ") avec succès !");
-                }).catch(eErr => {
-                    console.warn("EmailJS info (vérifier Service ID / Template ID / Clé API) :", eErr);
+            // Afficher la confirmation — l'utilisateur doit aller vérifier son email
+            hideAllAuthForms();
+            if (forgotPasswordWrapper) {
+                forgotPasswordWrapper.style.display = 'block';
+                // Remplacer le formulaire par un message de confirmation
+                forgotPasswordWrapper.innerHTML = `
+                    <button id="btn-forgot-to-login" type="button" class="btn-back-link">
+                        ← Retour à la connexion
+                    </button>
+                    <div style="text-align: center; padding: 20px 10px;">
+                        <div style="font-size: 3rem; margin-bottom: 12px;">📧</div>
+                        <h3 style="color: var(--primary-color); font-size: 1.1rem; margin-bottom: 10px;">Lien envoyé !</h3>
+                        <p style="color: #4a5568; font-size: 0.9rem; line-height: 1.5; margin-bottom: 16px;">
+                            Un lien de réinitialisation a été envoyé à :<br>
+                            <strong style="color: #1a202c;">${email}</strong>
+                        </p>
+                        <p style="color: #718096; font-size: 0.82rem; line-height: 1.4; background: #f7fafc; border-radius: 8px; padding: 10px;">
+                            📬 Vérifiez votre boîte de réception et le <strong>dossier Spams</strong>.<br>
+                            Le lien expire dans <strong>30 minutes</strong>.
+                        </p>
+                        <button type="button" id="btn-resend-link" style="margin-top: 14px; background: none; border: none; color: var(--primary-color); font-size: 0.85rem; font-weight: 600; cursor: pointer; text-decoration: underline;">
+                            🔄 Renvoyer le lien
+                        </button>
+                    </div>
+                `;
+                // Rebind les boutons du nouveau HTML
+                const backBtn = document.getElementById('btn-forgot-to-login');
+                if (backBtn) backBtn.addEventListener('click', () => btnShowLogin && btnShowLogin.click());
+                const resendBtn = document.getElementById('btn-resend-link');
+                if (resendBtn) resendBtn.addEventListener('click', () => {
+                    // Restaurer le formulaire
+                    location.reload();
                 });
             }
 
-            hideAllAuthForms();
-            if (resetPasswordWrapper) resetPasswordWrapper.style.display = 'block';
-            const otpInput = document.getElementById('reset-otp-code');
-            if (otpInput) otpInput.focus();
+            showToast(data.message || `Lien envoyé à ${email}. Vérifiez votre boite mail.`, "success");
             return true;
+
         } catch (err) {
-            console.error("Erreur d'envoi OTP :", err);
-            showToast(err.message || "Impossible de trouver le compte.", "error");
-            hideAllAuthForms();
-            if (forgotPasswordWrapper) forgotPasswordWrapper.style.display = 'block';
-            const forgotEmailInput = document.getElementById('forgot-email');
-            if (forgotEmailInput) {
-                forgotEmailInput.value = email;
-                forgotEmailInput.focus();
+            console.error("Erreur envoi lien reset :", err);
+            showToast(err.message || "Impossible d'envoyer le lien. Vérifiez l'email saisi.", "error");
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
             }
             return false;
         }
     };
 
+    // Bouton "Mot de passe oublié ?" dans le formulaire de connexion
     if (linkForgotPassword) {
         linkForgotPassword.addEventListener('click', (e) => {
             e.preventDefault();
@@ -427,7 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const loginEmail = loginEmailInput ? loginEmailInput.value.trim() : '';
 
             if (loginEmail) {
-                requestAndSendOtp(loginEmail);
+                requestResetLink(loginEmail);
             } else {
                 hideAllAuthForms();
                 if (forgotPasswordWrapper) forgotPasswordWrapper.style.display = 'block';
@@ -438,43 +498,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (btnForgotToLogin) {
-        btnForgotToLogin.addEventListener('click', () => btnShowLogin.click());
+        btnForgotToLogin.addEventListener('click', () => btnShowLogin && btnShowLogin.click());
     }
 
     if (btnResetToLogin) {
-        btnResetToLogin.addEventListener('click', () => btnShowLogin.click());
+        btnResetToLogin.addEventListener('click', () => btnShowLogin && btnShowLogin.click());
     }
 
+    // Formulaire Mot de Passe Oublié (saisie email → envoi lien)
     const forgotPasswordForm = document.getElementById('forgot-password-form');
     if (forgotPasswordForm) {
         forgotPasswordForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const emailInput = document.getElementById('forgot-email');
             const email = emailInput ? emailInput.value.trim() : '';
-            await requestAndSendOtp(email);
+            await requestResetLink(email);
         });
     }
 
-    // Formulaire Réinitialisation de Mot de Passe (Reset Password avec OTP 6 chiffres)
+    // Formulaire Réinitialisation (nouveau mot de passe via token de l'URL)
     const resetPasswordForm = document.getElementById('reset-password-form');
     if (resetPasswordForm) {
         resetPasswordForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const emailInput = document.getElementById('forgot-email');
-            const email = pendingResetEmail || (emailInput ? emailInput.value.trim().toLowerCase() : '');
-            const otpCodeInput = document.getElementById('reset-otp-code');
-            const code = otpCodeInput ? otpCodeInput.value.trim() : '';
-            const newPassword = document.getElementById('reset-new-password').value;
-            const confirmPassword = document.getElementById('reset-confirm-password').value;
 
-            if (!email) {
-                showToast("Adresse e-mail introuvable. Veuillez recommencer l'opération.", "error");
+            const tokenInput = document.getElementById('reset-token-input');
+            const token = tokenInput ? tokenInput.value.trim() : '';
+            const newPassword = document.getElementById('reset-new-password') ? document.getElementById('reset-new-password').value : '';
+            const confirmPassword = document.getElementById('reset-confirm-password') ? document.getElementById('reset-confirm-password').value : '';
+
+            if (!token) {
+                showToast("Lien invalide. Veuillez redemander un lien de réinitialisation.", "error");
                 hideAllAuthForms();
                 if (forgotPasswordWrapper) forgotPasswordWrapper.style.display = 'block';
-                return;
-            }
-            if (!code || code.length !== 6) {
-                showToast("Veuillez saisir le code de vérification à 6 chiffres.", "error");
                 return;
             }
             if (!newPassword || newPassword.length < 4) {
@@ -486,27 +542,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const submitBtn = resetPasswordForm.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span>⏳ Mise à jour...</span><span class="arrow">→</span>';
+            }
+
             try {
-                const res = await fetch(`${API.auth}?action=reset_password`, {
+                const res = await fetch(`${API.auth}?action=reset_password_by_token`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, code, newPassword })
+                    body: JSON.stringify({ token, newPassword })
                 });
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Échec de la réinitialisation du mot de passe.");
+                if (!res.ok) throw new Error(data.error || "Échec de la réinitialisation.");
 
-                showToast(data.message || "Mot de passe réinitialisé avec succès !", "success");
+                showToast("✅ " + (data.message || "Mot de passe réinitialisé avec succès !"), "success");
                 resetPasswordForm.reset();
-                pendingResetEmail = '';
-                if (btnShowLogin) btnShowLogin.click();
+                // Nettoyer l'URL (enlever ?resetToken=...)
+                if (window.history && window.history.replaceState) {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+                setTimeout(() => { if (btnShowLogin) btnShowLogin.click(); }, 1500);
+
             } catch (err) {
-                console.error("Erreur reset-password API :", err);
-                showToast(err.message || "Code de vérification invalide.", "error");
+                console.error("Erreur reset-password :", err);
+                showToast(err.message || "Lien invalide ou expiré. Refaites une demande.", "error");
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                }
             }
         });
     }
 
-    // Détection automatique d'un resetToken dans l'URL à l'ouverture de la page
+    // Détection automatique du ?resetToken= dans l'URL à l'ouverture de la page
     const checkUrlResetToken = () => {
         const urlParams = new URLSearchParams(window.location.search);
         let token = urlParams.get('resetToken') || urlParams.get('token');
@@ -516,14 +587,22 @@ document.addEventListener('DOMContentLoaded', () => {
             token = hashParams.get('resetToken') || hashParams.get('token');
         }
         if (token) {
+            // Masquer le splash screen et afficher le formulaire de reset
+            const splashScreen = document.getElementById('splash-screen');
+            if (splashScreen) splashScreen.style.display = 'none';
+            const loginScreen = document.getElementById('login-screen');
+            if (loginScreen) loginScreen.style.display = 'flex';
+
             hideAllAuthForms();
             if (resetPasswordWrapper) resetPasswordWrapper.style.display = 'block';
-            if (resetTokenInput) resetTokenInput.value = token;
-            showToast("Lien de réinitialisation détecté. Veuillez choisir votre nouveau mot de passe.", "info");
+            const tokenInput = document.getElementById('reset-token-input');
+            if (tokenInput) tokenInput.value = token;
+            showToast("🔐 Lien valide ! Choisissez votre nouveau mot de passe.", "info");
         }
     };
 
     checkUrlResetToken();
+
 
     // Formulaire d'Inscription
     const registerForm = document.getElementById('register-form');
@@ -1126,6 +1205,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const btn = document.querySelector(`button[onclick="window.validateMemberParts('${id}')"]`);
+        const originalText = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Validation...';
+            btn.style.opacity = '0.7';
+        }
+
         const member = state.members.find(m => String(m.id) === String(id));
         if (member) {
             try {
@@ -1142,6 +1229,11 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error("Erreur de validation:", error);
                 showToast(error.message || 'Erreur lors de la validation du membre.', 'error');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    btn.style.opacity = '1';
+                }
             }
         }
     };
@@ -1210,7 +1302,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeMembers = state.members.filter(m => (m.status === 'active' || (!m.status && m.status !== 'pending')) && m.role !== 'admin' && m.role !== 'admin_second');
 
         // 1. Render Pending Registrations (Admin View)
-        const pendingMembers = state.members.filter(m => m.status === 'pending');
+        const pendingMembers = state.members
+            .filter(m => m.status === 'pending')
+            .sort((a, b) => new Date(a.dateAjout) - new Date(b.dateAjout)); // Tri par date d'inscription (le plus ancien en premier)
         const pendingPanel = document.getElementById('pending-members-panel');
         const pendingBadge = document.getElementById('pending-badge');
         const pendingTableBody = document.querySelector('#pending-members-table tbody');
@@ -1257,8 +1351,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Active members list (excluding admins)
         const activeClientMembers = state.members.filter(m => m.status !== 'pending' && m.role !== 'admin' && m.role !== 'admin_second');
 
-        // Sort active members alphabetically
-        const sortedMembers = [...activeClientMembers].sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+        // Sort active members stably by registration date (oldest first) instead of alphabetically
+        const sortedMembers = [...activeClientMembers].sort((a, b) => new Date(a.dateAjout) - new Date(b.dateAjout));
 
         // Render Members Table (tab-membres)
         if (membersTableBody) {
@@ -1650,18 +1744,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     userMsgs.forEach(m => {
                         const isMe = m.sender === 'user';
                         const bubble = document.createElement('div');
-                        bubble.style.maxWidth = '75%';
-                        bubble.style.alignSelf = isMe ? 'flex-end' : 'flex-start';
-                        bubble.style.background = isMe ? 'var(--primary-color)' : '#edf2f7';
-                        bubble.style.color = isMe ? 'white' : '#2d3748';
-                        bubble.style.padding = '10px 14px';
-                        bubble.style.borderRadius = isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px';
-                        bubble.style.boxShadow = '0 1px 2px rgba(0,0,0,0.08)';
+                        bubble.className = `chat-bubble ${isMe ? 'user-bubble' : 'admin-bubble'}`;
 
-                        const timeStr = new Date(m.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                        let timeStr = 'Récemment';
+                        try {
+                            timeStr = new Date(m.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                        } catch (e) {}
+
                         bubble.innerHTML = `
-                            <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">${isMe ? 'Vous' : 'Admin ZUBIKS'} • ${timeStr}</div>
-                            <div style="font-size: 0.95rem; line-height: 1.45; word-break: break-word; white-space: pre-wrap;">${m.text}</div>
+                            <div class="chat-bubble-header">${isMe ? 'Vous' : 'Admin ZUBIKS'} • ${timeStr}</div>
+                            <div class="chat-bubble-text">${m.text}</div>
                         `;
                         userChatMessages.appendChild(bubble);
                     });
@@ -1678,17 +1770,30 @@ document.addEventListener('DOMContentLoaded', () => {
             const adminChatMessages = document.getElementById('admin-chat-messages');
             const adminUnreadBadge = document.getElementById('admin-unread-msg-badge');
             const searchChatInput = document.getElementById('search-chat-member');
+            const chatMembersCountBadge = document.getElementById('chat-members-count-badge');
             const searchTerm = searchChatInput ? searchChatInput.value.toLowerCase() : '';
 
             const allMsgs = state.messages || [];
             const activeMembers = (state.members || []).filter(m => m.status !== 'pending' && m.role !== 'admin');
 
-            // Auto-sélection du premier membre si aucun sélectionné
+            if (chatMembersCountBadge) {
+                chatMembersCountBadge.textContent = activeMembers.length;
+            }
+
+            // Détection du mode mobile
+            const isMobile = window.innerWidth <= 768;
+
+            // Auto-sélection : seulement sur desktop si aucun membre n'est sélectionné
             if (activeMembers.length > 0) {
                 const currentSelectedExists = activeMembers.some(m => String(m.id) === String(selectedAdminChatMemberId));
-                if (!selectedAdminChatMemberId || !currentSelectedExists) {
+                if (!currentSelectedExists) {
+                    selectedAdminChatMemberId = null;
+                }
+                if (!isMobile && !selectedAdminChatMemberId) {
                     selectedAdminChatMemberId = activeMembers[0].id;
                 }
+            } else {
+                selectedAdminChatMemberId = null;
             }
 
             // Total unread messages for admin
@@ -1707,14 +1812,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 searchChatInput.addEventListener('input', () => renderMessaging());
             }
 
+            // Gestion du bouton retour mobile ("← Liste")
             const mobileBackBtn = document.getElementById('admin-chat-mobile-back');
             if (mobileBackBtn && !mobileBackBtn.hasAttribute('data-bound')) {
                 mobileBackBtn.setAttribute('data-bound', 'true');
-                mobileBackBtn.addEventListener('click', () => {
+                mobileBackBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     selectedAdminChatMemberId = null;
                     const chatGrid = document.querySelector('.admin-chat-grid');
                     if (chatGrid) chatGrid.classList.remove('mobile-chat-open');
-                    renderAll();
+                    renderMessaging();
                 });
             }
 
@@ -1736,17 +1844,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         const mMsgs = allMsgs.filter(msg => String(msg.memberId) === String(m.id) || (msg.memberId && m.nom && String(msg.memberId).trim().toLowerCase() === String(m.nom).trim().toLowerCase()) || (msg.senderName && m.nom && String(msg.senderName).trim().toLowerCase() === String(m.nom).trim().toLowerCase() && msg.sender === 'user'));
                         const lastMsg = mMsgs[mMsgs.length - 1];
                         const unreadCount = mMsgs.filter(msg => msg.sender === 'user' && !msg.readByAdmin).length;
+                        const isSelected = String(m.id) === String(selectedAdminChatMemberId);
 
                         const item = document.createElement('div');
-                        item.className = 'chat-thread-item';
-                        item.style.padding = '10px';
-                        item.style.borderRadius = '8px';
-                        item.style.cursor = 'pointer';
-                        item.style.background = String(m.id) === String(selectedAdminChatMemberId) ? '#e2e8f0' : 'white';
-                        item.style.border = '1px solid #edf2f7';
-                        item.style.display = 'flex';
-                        item.style.justifyContent = 'space-between';
-                        item.style.alignItems = 'center';
+                        item.className = `chat-thread-item ${isSelected ? 'active-thread' : ''}`;
+
+                        const initials = (m.nom || 'M').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
                         item.onclick = () => {
                             selectedAdminChatMemberId = m.id;
@@ -1766,25 +1869,31 @@ document.addEventListener('DOMContentLoaded', () => {
                                     });
                                 } catch (e) { }
                             }
-                            const chatGrid = document.querySelector('.admin-chat-grid');
-                            if (chatGrid) chatGrid.classList.add('mobile-chat-open');
+                            const grid = document.querySelector('.admin-chat-grid');
+                            if (grid) grid.classList.add('mobile-chat-open');
 
                             renderMessaging();
                         };
 
+                        const timeStr = lastMsg ? new Date(lastMsg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+
                         item.innerHTML = `
-                            <div>
-                                <strong style="font-size: 0.9rem; color: #2d3748;">${m.nom}</strong>
-                                <div style="font-size: 0.8rem; color: #718096; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">
-                                    ${lastMsg ? lastMsg.text : 'Aucun message'}
+                            <div class="thread-avatar">${initials}</div>
+                            <div class="thread-content">
+                                <div class="thread-top">
+                                    <strong class="thread-name">${m.nom}</strong>
+                                    ${timeStr ? `<span class="thread-time">${timeStr}</span>` : ''}
+                                </div>
+                                <div class="thread-sub">
+                                    <span class="thread-last-msg">${lastMsg ? lastMsg.text : '<i>Aucun message encore</i>'}</span>
+                                    ${unreadCount > 0 ? `<span class="badge unread-badge">${unreadCount}</span>` : ''}
                                 </div>
                             </div>
-                            ${unreadCount > 0 ? `<span class="badge" style="background: var(--danger); color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.75rem;">${unreadCount}</span>` : ''}
                         `;
                         adminThreadsContainer.appendChild(item);
                     });
                 } else {
-                    adminThreadsContainer.innerHTML = '<div class="text-center text-muted" style="padding: 10px; font-size: 0.85rem;">Aucun membre trouvé.</div>';
+                    adminThreadsContainer.innerHTML = '<div class="empty-threads-state">Aucun membre trouvé</div>';
                 }
             }
 
@@ -1792,12 +1901,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const selectedMember = activeMembers.find(m => String(m.id) === String(selectedAdminChatMemberId));
             const chatHeaderName = document.getElementById('admin-chat-header-name');
             const chatHeaderInfo = document.getElementById('admin-chat-header-info');
+            const chatHeaderAvatar = document.getElementById('admin-chat-header-avatar');
             const chatInput = document.getElementById('admin-chat-input');
             const chatSendBtn = document.getElementById('admin-chat-send-btn');
 
             if (selectedMember) {
                 if (chatHeaderName) chatHeaderName.textContent = selectedMember.nom;
-                if (chatHeaderInfo) chatHeaderInfo.textContent = `${selectedMember.parts} part(s) • ${selectedMember.email || 'Email non spécifié'}`;
+                if (chatHeaderInfo) chatHeaderInfo.textContent = `${selectedMember.parts || 0} part(s) • ${selectedMember.email || 'Email non spécifié'}`;
+                if (chatHeaderAvatar) chatHeaderAvatar.textContent = (selectedMember.nom || 'M').charAt(0).toUpperCase();
                 if (chatInput) chatInput.disabled = false;
                 if (chatSendBtn) chatSendBtn.disabled = false;
 
@@ -1808,32 +1919,31 @@ document.addEventListener('DOMContentLoaded', () => {
                         memberMsgs.forEach(m => {
                             const isAdminMsg = m.sender === 'admin';
                             const bubble = document.createElement('div');
-                            bubble.style.maxWidth = '75%';
-                            bubble.style.alignSelf = isAdminMsg ? 'flex-end' : 'flex-start';
-                            bubble.style.background = isAdminMsg ? 'var(--primary-color)' : '#edf2f7';
-                            bubble.style.color = isAdminMsg ? 'white' : '#2d3748';
-                            bubble.style.padding = '10px 14px';
-                            bubble.style.borderRadius = isAdminMsg ? '12px 12px 2px 12px' : '12px 12px 12px 2px';
-                            bubble.style.boxShadow = '0 1px 2px rgba(0,0,0,0.08)';
+                            bubble.className = `chat-bubble ${isAdminMsg ? 'admin-bubble' : 'user-bubble'}`;
 
-                            const timeStr = new Date(m.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                            let timeStr = 'Récemment';
+                            try {
+                                timeStr = new Date(m.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                            } catch (e) {}
+
                             bubble.innerHTML = `
-                                <div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 4px; font-weight: 600;">${isAdminMsg ? 'Vous (Admin)' : selectedMember.nom} • ${timeStr}</div>
-                                <div style="font-size: 0.95rem; line-height: 1.45; word-break: break-word; white-space: pre-wrap;">${m.text}</div>
+                                <div class="chat-bubble-header">${isAdminMsg ? 'Vous (Administration)' : selectedMember.nom} • ${timeStr}</div>
+                                <div class="chat-bubble-text">${m.text}</div>
                             `;
                             adminChatMessages.appendChild(bubble);
                         });
                         setTimeout(() => { adminChatMessages.scrollTop = adminChatMessages.scrollHeight; }, 50);
                     } else {
-                        adminChatMessages.innerHTML = '<div class="text-center text-muted" style="margin-top: 60px;">Écrivez ci-dessous pour envoyer un message à ce membre.</div>';
+                        adminChatMessages.innerHTML = '<div class="empty-chat-placeholder"><div class="empty-chat-icon">💬</div><p>Écrivez ci-dessous pour démarrer la discussion avec ce membre.</p></div>';
                     }
                 }
             } else {
                 if (chatHeaderName) chatHeaderName.textContent = 'Sélectionnez un membre';
-                if (chatHeaderInfo) chatHeaderInfo.textContent = '';
+                if (chatHeaderInfo) chatHeaderInfo.textContent = 'Choisissez une conversation dans la liste pour lire et répondre.';
+                if (chatHeaderAvatar) chatHeaderAvatar.textContent = '👤';
                 if (chatInput) chatInput.disabled = true;
                 if (chatSendBtn) chatSendBtn.disabled = true;
-                if (adminChatMessages) adminChatMessages.innerHTML = '<div class="text-center text-muted" style="margin-top: 60px;">Sélectionnez une conversation dans la liste à gauche.</div>';
+                if (adminChatMessages) adminChatMessages.innerHTML = '<div class="empty-chat-placeholder"><div class="empty-chat-icon">👈</div><p>Sélectionnez une conversation dans la liste de gauche pour afficher les messages.</p></div>';
             }
         }
     };
@@ -1902,7 +2012,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Broadcast Message Handler (Modal UI Pro)
-    const btnBroadcast = document.getElementById('btn-broadcast-message');
     const broadcastModal = document.getElementById('broadcast-modal');
     const closeBroadcastModal = document.getElementById('close-broadcast-modal');
     const cancelBroadcastBtn = document.getElementById('cancel-broadcast-btn');
@@ -1910,6 +2019,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const broadcastTextarea = document.getElementById('broadcast-message-text');
     const broadcastTypeSelect = document.getElementById('broadcast-type');
     const broadcastMembersCount = document.getElementById('broadcast-members-count');
+
+    const openBroadcastModalFunc = () => {
+        const activeMembersList = (state.members || []).filter(m => m.status !== 'pending' && m.role !== 'admin' && m.role !== 'admin_second');
+        if (activeMembersList.length === 0) {
+            showToast("Aucun membre actif à qui envoyer l'annonce.", "error");
+            return;
+        }
+        if (broadcastMembersCount) {
+            broadcastMembersCount.textContent = `${activeMembersList.length} membre(s) actif(s)`;
+        }
+        if (broadcastModal) broadcastModal.style.display = 'flex';
+        if (broadcastTextarea) {
+            broadcastTextarea.value = '';
+            setTimeout(() => broadcastTextarea.focus(), 100);
+        }
+    };
 
     const closeBroadcastModalFunc = () => {
         if (broadcastModal) broadcastModal.style.display = 'none';
@@ -1919,25 +2044,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (closeBroadcastModal) closeBroadcastModal.addEventListener('click', closeBroadcastModalFunc);
     if (cancelBroadcastBtn) cancelBroadcastBtn.addEventListener('click', closeBroadcastModalFunc);
 
-    if (btnBroadcast) {
-        btnBroadcast.addEventListener('click', () => {
-            const activeMembersList = state.members.filter(m => m.status !== 'pending' && m.role !== 'admin' && m.role !== 'admin_second');
-            if (activeMembersList.length === 0) {
-                showToast("Aucun membre actif à qui envoyer l'annonce.", "error");
-                return;
-            }
-            if (broadcastMembersCount) {
-                broadcastMembersCount.textContent = `${activeMembersList.length} membre(s) actif(s)`;
-            }
-            if (broadcastModal) broadcastModal.style.display = 'flex';
-            if (broadcastTextarea) {
-                broadcastTextarea.value = '';
-                setTimeout(() => broadcastTextarea.focus(), 100);
-            }
-        });
-    }
+    // Écouteur global pour tous les boutons d'ouverture d'annonce
+    document.addEventListener('click', (e) => {
+        const target = e.target.closest('.btn-open-broadcast-modal, #btn-broadcast-message, #btn-top-broadcast');
+        if (target) {
+            e.preventDefault();
+            openBroadcastModalFunc();
+        }
+    });
 
-    // Quick emoji insertion
+    // Insertion d'émojis rapides
     document.querySelectorAll('.btn-emoji-quick').forEach(btn => {
         btn.addEventListener('click', () => {
             const emoji = btn.getAttribute('data-emoji');
@@ -1961,7 +2077,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const activeMembersList = state.members.filter(m => m.status !== 'pending' && m.role !== 'admin' && m.role !== 'admin_second');
+            const activeMembersList = (state.members || []).filter(m => m.status !== 'pending' && m.role !== 'admin' && m.role !== 'admin_second');
             if (activeMembersList.length === 0) {
                 showToast("Aucun membre actif à qui envoyer l'annonce.", "error");
                 return;
@@ -1974,29 +2090,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 submitBroadcastBtn.disabled = true;
                 submitBroadcastBtn.innerHTML = '<span>Diffusion en cours...</span>';
 
-                let count = 0;
-                for (const member of activeMembersList) {
-                    try {
-                        await fetch(`${API.messages}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                memberId: member.id,
-                                sender: 'admin',
-                                senderName: 'Administration',
-                                text: fullMessage
-                            })
-                        });
-                        count++;
-                    } catch (e) { }
-                }
+                // Tentative via l'action API backend d'annonce directe
+                const res = await fetch(`${API.messages}?action=broadcast`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: fullMessage,
+                        senderName: (currentUser ? currentUser.nom : 'Administration')
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Erreur de diffusion");
 
                 await loadState();
                 closeBroadcastModalFunc();
-                showToast(`Annonce diffusée avec succès à ${count} membre(s) !`, "success");
+                showToast(data.message || `Annonce diffusée avec succès à ${activeMembersList.length} membre(s) !`, "success");
             } catch (err) {
-                console.error("Erreur diffusion annonce:", err);
-                showToast("Erreur lors de la diffusion de l'annonce.", "error");
+                console.error("Erreur diffusion API backend, tentative fallback...", err);
+                // Fallback boucle client
+                try {
+                    let count = 0;
+                    for (const member of activeMembersList) {
+                        try {
+                            await fetch(`${API.messages}`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    memberId: member.id,
+                                    sender: 'admin',
+                                    senderName: 'Administration',
+                                    text: fullMessage
+                                })
+                            });
+                            count++;
+                        } catch (e) { }
+                    }
+                    await loadState();
+                    closeBroadcastModalFunc();
+                    showToast(`Annonce diffusée avec succès à ${count} membre(s) !`, "success");
+                } catch (fallbackErr) {
+                    showToast("Erreur lors de la diffusion de l'annonce.", "error");
+                }
             } finally {
                 if (submitBroadcastBtn) {
                     submitBroadcastBtn.disabled = false;
@@ -2035,35 +2170,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentOperationType = null;
     const operationDateInput = document.getElementById('operation-date');
 
-    const showToast = (message, type = 'success') => {
-        let container = document.getElementById('toast-container');
-        if (!container) return;
-
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-
-        let icon = '✅';
-        if (type === 'error') {
-            icon = '❌';
-        } else if (type === 'info') {
-            icon = 'ℹ️';
-        } else if (type === 'warning') {
-            icon = '⚠️';
-        }
-
-        // Si le message commence déjà par un emoji, ne pas ajouter d'icône en double
-        const cleanMsg = String(message || '').trim();
-        const startsWithEmoji = /^[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F680}-\u{1F6FF}]/u.test(cleanMsg);
-
-        toast.innerHTML = startsWithEmoji ? cleanMsg : `${icon} ${cleanMsg}`;
-
-        container.appendChild(toast);
-
-        setTimeout(() => {
-            toast.style.animation = 'fadeOut 0.3s ease forwards';
-            setTimeout(() => toast.remove(), 300);
-        }, 3500);
-    };
+    // showToast est défini globalement en haut du fichier (fonction hoistée)
 
     window.openOperationModal = (id, nom, type) => {
         currentOperationMemberId = id;
@@ -2681,6 +2788,121 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // =========================================
+    // --- PWA Installation Experience Handler ---
+    // =========================================
+    let deferredPrompt = null;
+    const pwaBanner = document.getElementById('pwa-install-banner');
+    const pwaAcceptBtn = document.getElementById('pwa-accept-btn');
+    const pwaDismissBtn = document.getElementById('pwa-dismiss-btn');
+    const pwaIosModal = document.getElementById('pwa-ios-modal');
+    const closeIosModalBtn = document.getElementById('close-ios-pwa-modal');
+    const btnCloseIosGuide = document.getElementById('btn-close-ios-guide');
+    const navInstallBtn = document.getElementById('btn-install-pwa');
+    const sidebarInstallBtn = document.getElementById('btn-install-pwa-sidebar');
+
+    const isStandalone = () => {
+        return window.matchMedia('(display-mode: standalone)').matches ||
+               window.navigator.standalone === true ||
+               (document.referrer && document.referrer.includes('android-app://'));
+    };
+
+    const isIosDevice = () => {
+        const ua = window.navigator.userAgent.toLowerCase();
+        return /iphone|ipad|ipod/.test(ua);
+    };
+
+    const showPwaInstallButtons = () => {
+        if (isStandalone()) return;
+        if (navInstallBtn) navInstallBtn.style.display = 'inline-flex';
+        if (sidebarInstallBtn) sidebarInstallBtn.style.display = 'block';
+    };
+
+    const hidePwaInstallBanner = () => {
+        if (pwaBanner) pwaBanner.style.display = 'none';
+    };
+
+    const triggerPwaInstall = () => {
+        if (isStandalone()) {
+            showToast("L'application est déjà installée sur votre appareil ! 🟢", "info");
+            return;
+        }
+
+        if (isIosDevice()) {
+            if (pwaIosModal) pwaIosModal.style.display = 'flex';
+            hidePwaInstallBanner();
+            return;
+        }
+
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult && choiceResult.outcome === 'accepted') {
+                    showToast("Merci ! L'application a été installée avec succès. 🎉", "success");
+                    hidePwaInstallBanner();
+                    if (navInstallBtn) navInstallBtn.style.display = 'none';
+                    if (sidebarInstallBtn) sidebarInstallBtn.style.display = 'none';
+                }
+                deferredPrompt = null;
+            });
+        } else {
+            showToast("Pour installer l'icône : ouvrez le menu de votre navigateur et cliquez sur 'Installer l'application' ou 'Ajouter à l'écran d'accueil'. 📲", "info");
+        }
+    };
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        showPwaInstallButtons();
+
+        const lastDismissed = localStorage.getItem('pwa_banner_dismissed_time');
+        const now = Date.now();
+        const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
+
+        if (!isStandalone() && (!lastDismissed || (now - parseInt(lastDismissed, 10)) > twoDaysMs)) {
+            setTimeout(() => {
+                if (pwaBanner) pwaBanner.style.display = 'block';
+            }, 1200);
+        }
+    });
+
+    if (isIosDevice() && !isStandalone()) {
+        showPwaInstallButtons();
+        const lastDismissed = localStorage.getItem('pwa_banner_dismissed_time');
+        const now = Date.now();
+        const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
+        if (!lastDismissed || (now - parseInt(lastDismissed, 10)) > twoDaysMs) {
+            setTimeout(() => {
+                if (pwaBanner) pwaBanner.style.display = 'block';
+            }, 1500);
+        }
+    }
+
+    if (pwaAcceptBtn) pwaAcceptBtn.addEventListener('click', triggerPwaInstall);
+    if (navInstallBtn) navInstallBtn.addEventListener('click', triggerPwaInstall);
+    if (sidebarInstallBtn) sidebarInstallBtn.addEventListener('click', triggerPwaInstall);
+
+    if (pwaDismissBtn) {
+        pwaDismissBtn.addEventListener('click', () => {
+            hidePwaInstallBanner();
+            localStorage.setItem('pwa_banner_dismissed_time', Date.now().toString());
+        });
+    }
+
+    const closeIosFunc = () => {
+        if (pwaIosModal) pwaIosModal.style.display = 'none';
+    };
+    if (closeIosModalBtn) closeIosModalBtn.addEventListener('click', closeIosFunc);
+    if (btnCloseIosGuide) btnCloseIosGuide.addEventListener('click', closeIosFunc);
+
+    window.addEventListener('appinstalled', () => {
+        deferredPrompt = null;
+        hidePwaInstallBanner();
+        if (navInstallBtn) navInstallBtn.style.display = 'none';
+        if (sidebarInstallBtn) sidebarInstallBtn.style.display = 'none';
+        showToast("ZUBIKS SERVICE est installé sous forme d'application ! 📲", "success");
+    });
 
     // Initialize
     const initializeAppUi = () => {
