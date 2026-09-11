@@ -1,4 +1,4 @@
-// =====================================================
+﻿// =====================================================
 // FONCTION TOAST GLOBALE — disponible avant DOMContentLoaded
 // =====================================================
 function showToast(message, type = 'success') {
@@ -148,14 +148,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // API Endpoints PHP & MySQL
-    const API = {
-        auth: '../api/auth.php',
-        members: '../api/members.php',
-        transactions: '../api/transactions.php',
-        stats: '../api/stats.php',
-        messages: '../api/messages.php'
-    };
+    // Firebase Service (remplace toutes les API PHP)
+    const { authService, membersService, transactionsService, messagesService, statsService } = window.FirebaseService;
+
+    // S'assurer que global_stats/main existe
+    statsService.ensureExists().catch(e => console.warn('[Stats] ensureExists:', e));
 
     let previousNotifIds = null;
 
@@ -216,114 +213,87 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Load State from PHP / MySQL Backend
-    let isLoadingState = false; // Evite les appels loadState() simultanés
-    const loadState = async () => {
-        if (isLoadingState) return; // Ne pas lancer un 2e appel si le 1er est en cours
-        isLoadingState = true;
-        try {
-            // Lancer les 4 requêtes EN PARALLÈLE (au lieu de séquentiellement)
-            // Gain : temps total = max(t1, t2, t3, t4) au lieu de t1+t2+t3+t4
-            const [statsRes, membersRes, txRes, msgRes] = await Promise.all([
-                fetch(`${API.stats}`),
-                fetch(`${API.members}`),
-                fetch(`${API.transactions}`),
-                fetch(`${API.messages}`)
-            ]);
+    // ─────────────────────────────────────────────────────────
+    // TEMPS RÉEL FIREBASE — Remplace loadState() + setInterval()
+    // ─────────────────────────────────────────────────────────
+    let _unsubscribeMembers = null;
+    let _unsubscribeTx = null;
+    let _unsubscribeMessages = null;
+    let _unsubscribeStats = null;
 
-            // 1. Traiter Stats
-            if (statsRes.ok) {
-                const data = await statsRes.json();
-                if (data.stats) {
-                    state.dailyDepots = parseFloat(data.stats.dailyDepots) || 0;
-                    state.dailyRetraits = parseFloat(data.stats.dailyRetraits) || 0;
-                    state.cycleDepots = parseFloat(data.stats.cycleDepots) || 0;
-                    state.cycleRetraits = parseFloat(data.stats.cycleRetraits) || 0;
-                    state.argentDebut = parseFloat(data.stats.argentDebut) || 0;
-                    state.reglements = data.stats.reglements || "";
-                    state.credentials = { email: data.stats.admin_email || 'zubiksservice@gmail.com' };
-                    state.adminProfilePhoto = data.stats.profilePhoto || "";
+    // Stub de compatibilité (certains endroits appellent encore loadState())
+    const loadState = async () => { /* no-op : remplacé par onSnapshot */ };
 
-                    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'admin_second')) {
-                        if (state.adminProfilePhoto) {
-                            currentUser.profilePhoto = state.adminProfilePhoto;
-                            saveActiveSession(currentUser);
+    const setupListeners = () => { /* no-op : remplacé par setupRealtimeListeners */ };
+
+    const setupRealtimeListeners = () => {
+        // 1. Membres
+        _unsubscribeMembers = membersService.subscribe((members) => {
+            state.members = members;
+
+            if (currentUser && currentUser.id) {
+                const freshUser = members.find(m => m.id === currentUser.id);
+                if (freshUser) {
+                    const newNotifs = getNotificationsArray(freshUser.notifications);
+                    if (previousNotifIds !== null) {
+                        const newUnread = newNotifs.filter(n => !n.read && !previousNotifIds.has(String(n.id)));
+                        if (newUnread.length > 0) {
+                            playNotificationSound();
+                            newUnread.forEach(n => {
+                                showToast(n.message, 'info');
+                                triggerSystemNotification('🟢 Zubiks Service', n.message);
+                            });
                         }
                     }
-
-                    const textarea = document.querySelector('.modern-textarea');
-                    if (textarea && document.activeElement !== textarea) textarea.value = state.reglements;
-
-                    const changeEmailInput = document.getElementById('change-email');
-                    if (changeEmailInput) {
-                        if (currentUser && currentUser.role !== 'admin') {
-                            changeEmailInput.value = currentUser.email || '';
-                        } else if (state.credentials.email) {
-                            changeEmailInput.value = state.credentials.email;
-                        }
-                    }
-                }
-                state.archives = data.archives || [];
-                state.dailyArchives = data.dailyArchives || [];
-            }
-
-            // 2. Traiter Membres
-            if (membersRes.ok) {
-                const membersData = await membersRes.json();
-                state.members = Array.isArray(membersData) ? membersData : [];
-
-                if (currentUser) {
-                    const freshUser = state.members.find(m => String(m.id) === String(currentUser.id) || (m.nom && currentUser.nom && m.nom.trim().toLowerCase() === currentUser.nom.trim().toLowerCase()));
-                    if (freshUser) {
-                        const newNotifs = getNotificationsArray(freshUser.notifications);
-
-                        if (previousNotifIds !== null) {
-                            const newUnread = newNotifs.filter(n => !n.read && !previousNotifIds.has(String(n.id)));
-                            if (newUnread.length > 0) {
-                                playNotificationSound();
-                                newUnread.forEach(n => {
-                                    showToast(`${n.message}`, 'info');
-                                    triggerSystemNotification('🟢 Zubiks Service Notification', n.message);
-                                });
-                            }
-                        }
-
-                        previousNotifIds = new Set(newNotifs.map(n => String(n.id)));
-
-                        currentUser = { ...currentUser, ...freshUser };
-                        saveActiveSession(currentUser);
-                    }
+                    previousNotifIds = new Set(newNotifs.map(n => String(n.id)));
+                    currentUser = { ...currentUser, ...freshUser };
+                    saveActiveSession(currentUser);
                 }
             }
-
-            // 3. Traiter Transactions
-            if (txRes.ok) {
-                const txData = await txRes.json();
-                state.transactions = Array.isArray(txData) ? txData : [];
-            }
-
-            // 4. Traiter Messages
-            if (msgRes.ok) {
-                const msgData = await msgRes.json();
-                state.messages = Array.isArray(msgData) ? msgData : [];
-            }
-
             renderAll();
-        } catch (err) {
-            console.error("Erreur de chargement API Backend :", err);
-        } finally {
-            isLoadingState = false;
-        }
+        });
+
+        // 2. Transactions
+        _unsubscribeTx = transactionsService.subscribe((txs) => {
+            state.transactions = txs;
+            renderAll();
+        });
+
+        // 3. Messages
+        _unsubscribeMessages = messagesService.subscribe((msgs) => {
+            state.messages = msgs;
+            renderAll();
+        });
+
+        // 4. Stats globales + Archives
+        _unsubscribeStats = statsService.subscribe(({ stats, archives, dailyArchives }) => {
+            state.dailyDepots   = parseFloat(stats.dailyDepots)  || 0;
+            state.dailyRetraits = parseFloat(stats.dailyRetraits) || 0;
+            state.cycleDepots   = parseFloat(stats.cycleDepots)  || 0;
+            state.cycleRetraits = parseFloat(stats.cycleRetraits) || 0;
+            state.argentDebut   = parseFloat(stats.argentDebut)  || 0;
+            state.reglements    = stats.reglements || '';
+            state.credentials   = { email: stats.adminEmail || 'zubiksservice@gmail.com' };
+            state.adminProfilePhoto = stats.profilePhoto || '';
+            state.archives      = archives;
+            state.dailyArchives = dailyArchives;
+
+            const textarea = document.querySelector('.modern-textarea');
+            if (textarea && document.activeElement !== textarea) textarea.value = state.reglements;
+
+            const changeEmailInput = document.getElementById('change-email');
+            if (changeEmailInput && currentUser) {
+                changeEmailInput.value = currentUser.email || state.credentials.email || '';
+            }
+            renderAll();
+        });
     };
 
-    // Setup Auto Refresh / Polling (intervalle augmenté à 20s pour réduire la charge serveur)
-    let syncInterval = null;
-    const setupListeners = () => {
-        if (!syncInterval) {
-            syncInterval = setInterval(() => {
-                loadState();
-            }, 20000); // 20s : moins de charge serveur, toujours quasi-temps réel
-        }
+    const teardownRealtimeListeners = () => {
+        if (_unsubscribeMembers)  { _unsubscribeMembers();  _unsubscribeMembers = null; }
+        if (_unsubscribeTx)       { _unsubscribeTx();       _unsubscribeTx = null; }
+        if (_unsubscribeMessages) { _unsubscribeMessages(); _unsubscribeMessages = null; }
+        if (_unsubscribeStats)    { _unsubscribeStats();    _unsubscribeStats = null; }
     };
 
     // Save State is replaced by atomic operations in collections.
@@ -398,10 +368,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =====================================================
-    // SYSTÈME DE RÉINITIALISATION PAR LIEN EMAIL SÉCURISÉ
+    // MOT DE PASSE OUBLIÉ — Firebase Auth (fiable, sans PHP)
     // =====================================================
 
-    // Étape 1 : Demande d'envoi du lien de réinitialisation
     const requestResetLink = async (targetEmail) => {
         const email = targetEmail ? targetEmail.trim().toLowerCase() : '';
         if (!email) {
@@ -413,89 +382,55 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
 
-        // Afficher état de chargement
         const submitBtn = document.querySelector('.btn-forgot-submit');
         const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span>⏳ Envoi en cours...</span>';
-        }
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<span>\u23f3 Envoi en cours...</span>'; }
 
         try {
-            // 1. Le PHP génère le token sécurisé et retourne le lien de reset
-            const res = await fetch(`${API.auth}?action=request_reset_link`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Impossible de générer le lien de réinitialisation.");
+            await authService.sendPasswordReset(email);
 
-            // 2. Envoyer l'email via EmailJS directement depuis le navigateur
-            // (contourne les restrictions cURL des hébergements gratuits comme InfinityFree)
-            if (data.resetLink && typeof emailjs !== 'undefined') {
-                try {
-                    await emailjs.send(
-                        'service_pbpkjea',  // Service ID
-                        'template_2qjiyse', // Template ID
-                        {
-                            to_email: email,
-                            subject:  data.subject  || '🔐 ZUBIKS SERVICE — Réinitialisation de votre mot de passe',
-                            message:  data.emailBody || `Votre lien de réinitialisation : ${data.resetLink}`,
-                            reply_to: 'zubiksservice@gmail.com'
-                        },
-                        '8YpcdEl31a-Y81ilz' // Public Key
-                    );
-                } catch (ejsErr) {
-                    console.warn("EmailJS send warning:", ejsErr);
-                    // Ne pas bloquer l'UX si l'envoi EmailJS échoue — le token est déjà en BDD
-                }
-            }
-
-            // 3. Afficher la confirmation à l'utilisateur
             hideAllAuthForms();
             if (forgotPasswordWrapper) {
                 forgotPasswordWrapper.style.display = 'block';
                 forgotPasswordWrapper.innerHTML = `
                     <button id="btn-forgot-to-login" type="button" class="btn-back-link">
-                        ← Retour à la connexion
+                        \u2190 Retour \u00e0 la connexion
                     </button>
                     <div style="text-align: center; padding: 20px 10px;">
-                        <div style="font-size: 3rem; margin-bottom: 12px;">📧</div>
-                        <h3 style="color: var(--primary-color); font-size: 1.1rem; margin-bottom: 10px;">Lien envoyé !</h3>
+                        <div style="font-size: 3rem; margin-bottom: 12px;">\ud83d\udce7</div>
+                        <h3 style="color: var(--primary-color); font-size: 1.1rem; margin-bottom: 10px;">Email envoy\u00e9 !</h3>
                         <p style="color: #4a5568; font-size: 0.9rem; line-height: 1.5; margin-bottom: 16px;">
-                            Un lien de réinitialisation a été envoyé à :<br>
+                            Un lien de r\u00e9initialisation a \u00e9t\u00e9 envoy\u00e9 \u00e0 :<br>
                             <strong style="color: #1a202c;">${email}</strong>
                         </p>
                         <p style="color: #718096; font-size: 0.82rem; line-height: 1.4; background: #f7fafc; border-radius: 8px; padding: 10px;">
-                            📬 Vérifiez votre boîte de réception et le <strong>dossier Spams</strong>.<br>
-                            Le lien expire dans <strong>30 minutes</strong>.
+                            \ud83d\udce4 V\u00e9rifiez votre bo\u00eete de r\u00e9ception et le <strong>dossier Spams</strong>.<br>
+                            Le lien expire dans <strong>1 heure</strong> (s\u00e9curis\u00e9 par Firebase).
                         </p>
-                        <button type="button" id="btn-resend-link" style="margin-top: 14px; background: none; border: none; color: var(--primary-color); font-size: 0.85rem; font-weight: 600; cursor: pointer; text-decoration: underline;">
-                            🔄 Renvoyer le lien
+                        <button type="button" id="btn-resend-link" style="margin-top:14px;background:none;border:none;color:var(--primary-color);font-size:0.85rem;font-weight:600;cursor:pointer;text-decoration:underline;">
+                            \ud83d\udd04 Renvoyer le lien
                         </button>
                     </div>
                 `;
                 const backBtn = document.getElementById('btn-forgot-to-login');
                 if (backBtn) backBtn.addEventListener('click', () => btnShowLogin && btnShowLogin.click());
                 const resendBtn = document.getElementById('btn-resend-link');
-                if (resendBtn) resendBtn.addEventListener('click', () => { location.reload(); });
+                if (resendBtn) resendBtn.addEventListener('click', () => requestResetLink(email));
             }
 
-            showToast(`Lien envoyé à ${email}. Vérifiez votre boite mail.`, "success");
+            showToast(`Email de r\u00e9initialisation envoy\u00e9 \u00e0 ${email}. V\u00e9rifiez votre bo\u00eete mail.`, "success");
             return true;
 
         } catch (err) {
-            console.error("Erreur envoi lien reset :", err);
-            showToast(err.message || "Impossible d'envoyer le lien. Vérifiez l'email saisi.", "error");
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalBtnText;
-            }
+            let msg = "Impossible d'envoyer le lien. V\u00e9rifiez l'email saisi.";
+            if (err.code === 'auth/user-not-found') msg = "Aucun compte trouv\u00e9 avec cet email.";
+            if (err.code === 'auth/invalid-email') msg = "Adresse email invalide.";
+            if (err.code === 'auth/too-many-requests') msg = "Trop de tentatives. R\u00e9essayez dans quelques minutes.";
+            showToast(msg, "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
             return false;
         }
     };
-
 
     // Bouton "Mot de passe oublié ?" dans le formulaire de connexion
     if (linkForgotPassword) {
@@ -622,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
     checkUrlResetToken();
 
 
-    // Formulaire d'Inscription
+    // Formulaire d'Inscription (Firebase Auth)
     const registerForm = document.getElementById('register-form');
     if (registerForm) {
         registerForm.addEventListener('submit', async (e) => {
@@ -638,66 +573,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const submitBtn = registerForm.querySelector('button[type="submit"]');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '⏳ Inscription...'; }
+
             try {
-                const res = await fetch(`${API.auth}?action=register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nom, postnom, sexe, email, password })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Erreur lors de l'inscription.");
+                await authService.register(nom, postnom, sexe, email, password);
 
-                await loadState();
-
-                // Envoi direct des mails de bienvenue (Membre & Admin) via EmailJS si disponible
+                // Notification EmailJS au nouvel inscrit et à l'admin
                 if (window.emailjs) {
-                    const serviceId = window.EMAILJS_SERVICE_ID || "service_zubiks";
-                    const templateId = window.EMAILJS_TEMPLATE_ID || "template_otp";
-
-                    // 1. Mail de bienvenue pour le nouveau membre
-                    emailjs.send(serviceId, templateId, {
-                        to_email: email,
-                        user_email: email,
-                        email: email,
-                        recipient_email: email,
-                        user_name: `${nom} ${postnom}`.trim(),
-                        name: `${nom} ${postnom}`.trim(),
-                        message: `Bienvenue chez ZUBIKS SERVICE ! Votre compte (${email}) a été créé avec succès.`
-                    }).catch(eErr => {
-                        console.warn("EmailJS member email info:", eErr);
-                    });
-
-                    // 2. Mail de notification pour l'administrateur
+                    const sId = window.EMAILJS_SERVICE_ID || 'service_pbpkjea';
+                    const tId = window.EMAILJS_TEMPLATE_ID || 'template_2qjiyse';
                     const adminEmail = (state && state.credentials && state.credentials.email) ? state.credentials.email : 'zubiksservice@gmail.com';
-                    emailjs.send(serviceId, templateId, {
-                        to_email: adminEmail,
-                        user_email: adminEmail,
-                        email: adminEmail,
-                        recipient_email: adminEmail,
-                        user_name: "Admin ZUBIKS",
-                        name: "Admin ZUBIKS",
-                        message: `📢 NOUVEAU MEMBRE : Le membre ${nom} ${postnom} (${email}) vient de créer son compte sur ZUBIKS SERVICE. Veuillez vous connecter pour valider son profil.`
-                    }).catch(eErr => {
-                        console.warn("EmailJS admin notification info:", eErr);
-                    });
+                    emailjs.send(sId, tId, { to_email: email, message: `Bienvenue chez ZUBIKS SERVICE ! Votre compte (${email}) a été créé. En attente de validation.` }).catch(() => {});
+                    emailjs.send(sId, tId, { to_email: adminEmail, message: `📢 NOUVEAU MEMBRE : ${nom} ${postnom} (${email}) vient de s'inscrire. Validez son profil.` }).catch(() => {});
                 }
 
                 registerForm.reset();
-                showToast("Inscription réussie ! Un e-mail de confirmation vous a été envoyé.", "success");
+                showToast("Inscription réussie ! Votre compte est en attente de validation.", "success");
                 if (btnShowLogin) btnShowLogin.click();
-
                 const loginEmailInput = document.getElementById('email');
-                const loginPasswordInput = document.getElementById('password');
                 if (loginEmailInput) loginEmailInput.value = email;
-                if (loginPasswordInput) setTimeout(() => loginPasswordInput.focus(), 150);
             } catch (err) {
-                console.error("Erreur d'inscription Backend :", err);
+                console.error("Erreur inscription Firebase:", err);
                 showToast(err.message || "Erreur lors de l'inscription.", "error");
+            } finally {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = "S'inscrire"; }
             }
         });
     }
 
-    // Formulaire de Connexion
+    // Formulaire de Connexion (Firebase Auth)
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = document.getElementById('email').value.trim().toLowerCase();
@@ -708,27 +613,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Feedback visuel immédiat sur le bouton
         const loginBtn = loginForm.querySelector('button[type="submit"]');
         const originalBtnText = loginBtn ? loginBtn.innerHTML : '';
-        if (loginBtn) {
-            loginBtn.disabled = true;
-            loginBtn.innerHTML = '<span>⏳ Connexion...</span>';
-        }
+        if (loginBtn) { loginBtn.disabled = true; loginBtn.innerHTML = '<span>⏳ Connexion...</span>'; }
 
         try {
-            const res = await fetch(`${API.auth}?action=login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Erreur de connexion.");
-
-            currentUser = data.user;
+            const userData = await authService.login(email, password);
+            currentUser = userData;
             saveActiveSession(currentUser);
 
-            // Afficher le dashboard IMMÉDIATEMENT (sans attendre loadState)
+            // Afficher le dashboard immédiatement
             switchRoleView();
             loginScreen.classList.remove('active');
             dashboardScreen.classList.add('active');
@@ -736,19 +630,14 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast(`Connexion réussie (${currentUser.role === 'admin' ? 'Administrateur' : currentUser.nom})`, 'success');
             requestNotificationPermission();
 
-            // Charger les données en arrière-plan (non bloquant)
-            loadState().then(() => {
-                renderAll();
-                setupListeners(); // Démarrer le polling seulement après le 1er chargement réussi
-            });
+            // Démarrer les listeners temps réel Firebase (remplace le polling)
+            teardownRealtimeListeners();
+            setupRealtimeListeners();
 
         } catch (err) {
-            console.error("Erreur de connexion Backend :", err);
+            console.error("Erreur de connexion Firebase:", err);
             showToast(err.message || 'Email ou mot de passe incorrect.', 'error');
-            if (loginBtn) {
-                loginBtn.disabled = false;
-                loginBtn.innerHTML = originalBtnText;
-            }
+            if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = originalBtnText; }
         }
     });
 
@@ -789,21 +678,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (currentUser) {
                     try {
                         if (currentUser.role === 'admin' || currentUser.role === 'admin_second') {
-                            await fetch(`${API.stats}?action=update_admin_photo`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ profilePhoto: base64String })
-                            });
+                            await statsService.updateAdminPhoto(base64String);
                             currentUser.profilePhoto = base64String;
                             state.adminProfilePhoto = base64String;
                         } else {
-                            await fetch(`${API.members}?action=update_photo`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: currentUser.id, profilePhoto: base64String })
-                            });
-                            const userIndex = state.members.findIndex(m => String(m.id) === String(currentUser.id));
-                            if (userIndex !== -1) state.members[userIndex].profilePhoto = base64String;
+                            await membersService.updatePhoto(currentUser.id, base64String);
                             currentUser.profilePhoto = base64String;
                         }
                         saveActiveSession(currentUser);
@@ -883,9 +762,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const performLogout = async (msg = 'Vous êtes déconnecté.') => {
-        try {
-            await fetch(`${API.auth}?action=logout`, { method: 'POST' });
-        } catch (error) { }
+        teardownRealtimeListeners();
+        try { await authService.logout(); } catch (e) {}
 
         currentUser = null;
         localStorage.removeItem('zubiks_jwt_token');
@@ -1002,13 +880,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     if (updatedMsgs) {
                         renderAll();
-                        try {
-                            fetch(`${API.messages}?action=mark_read`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ memberId: currentUser.id, readBy: 'user' })
-                            });
-                        } catch (e) { }
+                        try { messagesService.markRead(currentUser.id, 'user'); } catch (e) {}
                     }
                 } else if (targetId === 'tab-user-notifications' && currentUser) {
                     let updatedNotifs = false;
@@ -1023,19 +895,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (updatedNotifs) {
                         currentUser.notifications = newNotifs;
                         renderAll();
-                        try {
-                            fetch(`${API.members}?action=update_notifs`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: currentUser.id, notifications: newNotifs })
-                            }).then(r => r.json()).then(data => {
-                                if (data && data.notifications) {
-                                    currentUser.notifications = data.notifications;
-                                    saveActiveSession(currentUser);
-                                    renderAll();
-                                }
-                            });
-                        } catch (e) { }
+                        try { await membersService.markNotifsRead(currentUser.id, newNotifs); } catch (e) {}
                     }
                 }
             }
@@ -1212,15 +1072,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             try {
-                const res = await fetch(`${API.members}?action=add`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nom, parts })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Erreur lors de l'ajout.");
-
-                await loadState();
+                await membersService.add(nom, parts);
                 addMemberForm.reset();
                 showToast('Nouveau membre ajouté avec succès.', 'success');
             } catch (error) {
@@ -1252,24 +1104,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const member = state.members.find(m => String(m.id) === String(id));
         if (member) {
             try {
-                const res = await fetch(`${API.members}?action=validate`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, parts })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Erreur de validation.");
-
-                await loadState();
+                await membersService.validate(id, parts);
                 showToast(`Compte de "${member.nom}" validé avec ${parts} part(s).`, "success");
             } catch (error) {
                 console.error("Erreur de validation:", error);
                 showToast(error.message || 'Erreur lors de la validation du membre.', 'error');
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                    btn.style.opacity = '1';
-                }
+                if (btn) { btn.disabled = false; btn.innerHTML = originalText; btn.style.opacity = '1'; }
             }
         }
     };
@@ -1773,13 +1613,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
                 if (markUpdated) {
-                    try {
-                        fetch(`${API.messages}?action=mark_read`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ memberId: currentUser.id, readBy: 'user' })
-                        });
-                    } catch (e) { }
+                    try { messagesService.markRead(currentUser.id, 'user'); } catch (e) {}
                 }
             }
 
@@ -1916,13 +1750,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 }
                             });
                             if (markUpdated) {
-                                try {
-                                    fetch(`${API.messages}?action=mark_read`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ memberId: m.id, readBy: 'admin' })
-                                    });
-                                } catch (e) { }
+                                try { messagesService.markRead(m.id, 'admin'); } catch (e) {}
                             }
                             const grid = document.querySelector('.admin-chat-grid');
                             if (grid) grid.classList.add('mobile-chat-open');
@@ -2013,20 +1841,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (text && currentUser && currentUser.role !== 'admin') {
                 try {
-                    const res = await fetch(`${API.messages}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            memberId: currentUser.id,
-                            sender: 'user',
-                            senderName: currentUser.nom,
-                            text: text
-                        })
-                    });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || "Erreur d'envoi");
-
-                    await loadState();
+                    await messagesService.send(currentUser.id, 'user', currentUser.nom, text);
                     if (input) input.value = '';
                 } catch (err) {
                     showToast(err.message || "Erreur lors de l'envoi du message.", "error");
@@ -2044,20 +1859,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (text && selectedAdminChatMemberId) {
                 try {
-                    const res = await fetch(`${API.messages}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            memberId: selectedAdminChatMemberId,
-                            sender: 'admin',
-                            senderName: (currentUser ? currentUser.nom : 'Admin ZUBIKS'),
-                            text: text
-                        })
-                    });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || "Erreur d'envoi");
-
-                    await loadState();
+                    await messagesService.send(selectedAdminChatMemberId, 'admin', currentUser ? currentUser.nom : 'Admin ZUBIKS', text);
                     if (input) { input.value = ''; input.style.height = 'auto'; }
                 } catch (err) {
                     showToast(err.message || "Erreur lors de l'envoi du message.", "error");
@@ -2145,48 +1947,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 submitBroadcastBtn.disabled = true;
                 submitBroadcastBtn.innerHTML = '<span>Diffusion en cours...</span>';
 
-                // Tentative via l'action API backend d'annonce directe
-                const res = await fetch(`${API.messages}?action=broadcast`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        text: fullMessage,
-                        senderName: (currentUser ? currentUser.nom : 'Administration')
-                    })
-                });
-
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Erreur de diffusion");
-
-                await loadState();
+                const memberIds = activeMembersList.map(m => m.id);
+                const count = await messagesService.broadcast(fullMessage, currentUser ? currentUser.nom : 'Administration', memberIds);
                 closeBroadcastModalFunc();
-                showToast(data.message || `Annonce diffusée avec succès à ${activeMembersList.length} membre(s) !`, "success");
+                showToast(`Annonce diffusée avec succès à ${count} membre(s) !`, "success");
             } catch (err) {
-                console.error("Erreur diffusion API backend, tentative fallback...", err);
-                // Fallback boucle client
-                try {
-                    let count = 0;
-                    for (const member of activeMembersList) {
-                        try {
-                            await fetch(`${API.messages}`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    memberId: member.id,
-                                    sender: 'admin',
-                                    senderName: 'Administration',
-                                    text: fullMessage
-                                })
-                            });
-                            count++;
-                        } catch (e) { }
-                    }
-                    await loadState();
-                    closeBroadcastModalFunc();
-                    showToast(`Annonce diffusée avec succès à ${count} membre(s) !`, "success");
-                } catch (fallbackErr) {
-                    showToast("Erreur lors de la diffusion de l'annonce.", "error");
-                }
+                console.error("Erreur diffusion:", err);
+                showToast("Erreur lors de la diffusion de l'annonce.", "error");
             } finally {
                 if (submitBroadcastBtn) {
                     submitBroadcastBtn.disabled = false;
@@ -2320,30 +2087,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (isConfirmed) {
                     try {
-                        const res = await fetch(`${API.transactions}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                memberId: member.id,
-                                memberNom: member.nom,
-                                type: currentOperationType,
-                                amount: amount,
-                                adminNom: (currentUser ? currentUser.nom : 'Admin'),
-                                date: opDate
-                            })
-                        });
-                        const data = await res.json();
-                        if (!res.ok) throw new Error(data.error || "Erreur lors de l'opération.");
-
-                        await loadState();
+                        await transactionsService.add(
+                            member.id,
+                            member.nom,
+                            currentOperationType,
+                            amount,
+                            currentUser ? currentUser.nom : 'Admin'
+                        );
                         if (notifChannel) {
                             notifChannel.postMessage({ type: 'NEW_TRANSACTION', memberId: member.id, memberNom: member.nom });
                         }
                         operationModal.classList.remove('active');
                         showToast(`Le ${typeName} de ${amount.toLocaleString('fr-FR')} Fc (Cash) a été enregistré.`, 'success');
-
                     } catch (error) {
-                        console.error("Erreur lors de l'enregistrement de l'opération :", error);
+                        console.error("Erreur lors de l'opération Firebase:", error);
                         showToast(error.message || "Erreur lors de l'enregistrement de l'opération.", "error");
                     }
                 }
@@ -2358,12 +2115,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const admin = state.members.find(m => String(m.id) === String(id));
         if (admin && confirm(`Voulez-vous vraiment supprimer l'administrateur secondaire "${admin.nom}" ?`)) {
             try {
-                const res = await fetch(`${API.members}?action=delete&id=${id}`, { method: 'DELETE' });
-                if (!res.ok) throw new Error("Erreur de suppression");
-                await loadState();
+                await membersService.delete(id);
                 showToast('Administrateur secondaire supprimé avec succès.', 'success');
             } catch (err) {
-                console.error(err);
                 showToast("Erreur lors de la suppression.", "error");
             }
         }
@@ -2373,12 +2127,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const member = state.members.find(m => String(m.id) === String(id));
         if (member && confirm(`Voulez-vous vraiment supprimer le membre "${member.nom}" ?`)) {
             try {
-                const res = await fetch(`${API.members}?action=delete&id=${id}`, { method: 'DELETE' });
-                if (!res.ok) throw new Error("Erreur de suppression");
-                await loadState();
+                await membersService.delete(id);
                 showToast('Membre supprimé avec succès.', 'success');
             } catch (err) {
-                console.error(err);
                 showToast("Erreur lors de la suppression.", "error");
             }
         }
@@ -2407,18 +2158,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (newNom && newParts > 0) {
                 try {
-                    const res = await fetch(`${API.members}?action=update`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id, nom: newNom, parts: newParts })
-                    });
-                    if (!res.ok) throw new Error("Erreur de mise à jour");
-
-                    await loadState();
+                    await membersService.update(id, newNom, newParts);
                     if (editMemberModal) editMemberModal.classList.remove('active');
                     showToast('Membre mis à jour.', 'success');
                 } catch (err) {
-                    console.error(err);
                     showToast("Erreur de mise à jour.", "error");
                 }
             }
@@ -2450,17 +2193,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         promoteBtn.style.backgroundColor = 'var(--danger-color, #e53e3e)';
                         promoteBtn.onclick = async () => {
                             if (confirm(`Voulez-vous retirer les droits d'administrateur à ${member.nom} ?`)) {
-                                member.role = 'user';
-                                try {
-                                    await fetch(`${API.members}?action=update_role`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ id: member.id, role: 'user' })
-                                    });
-                                } catch (e) { }
+                                try { await membersService.updateRole(member.id, 'user'); } catch (e) {}
                                 showToast(`${member.nom} n'est plus administrateur.`, 'success');
                                 memberDetailsModal.classList.remove('active');
-                                renderAll();
                             }
                         };
                     } else {
@@ -2472,18 +2207,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 showToast('Limite atteinte : Vous ne pouvez pas avoir plus de 5 administrateurs secondaires.', 'error');
                                 return;
                             }
-                            if (confirm(`Voulez-vous promouvoir ${member.nom} comme Administrateur Secondaire ?\n\nIl aura accès au tableau de bord, mais sans les droits de sécurité.`)) {
-                                member.role = 'admin_second';
-                                try {
-                                    await fetch(`${API.members}?action=update_role`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ id: member.id, role: 'admin_second' })
-                                    });
-                                } catch (e) { }
+                            if (confirm(`Voulez-vous promouvoir ${member.nom} comme Administrateur Secondaire ?`)) {
+                                try { await membersService.updateRole(member.id, 'admin_second'); } catch (e) {}
                                 showToast(`${member.nom} est maintenant administrateur secondaire !`, 'success');
                                 memberDetailsModal.classList.remove('active');
-                                renderAll();
                             }
                         };
                     }
@@ -2570,14 +2297,9 @@ document.addEventListener('DOMContentLoaded', () => {
         archiveDailyBtn.addEventListener('click', async () => {
             if (confirm('Voulez-vous vraiment archiver la journée ? Cela remettra à zéro les compteurs journaliers.')) {
                 try {
-                    const res = await fetch(`${API.stats}?action=archive_day`, { method: 'POST' });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || "Erreur lors de l'archivage.");
-
-                    await loadState();
+                    await statsService.archiveDay(state.dailyDepots, state.dailyRetraits);
                     showToast('Journée archivée avec succès.', 'success');
                 } catch (error) {
-                    console.error("Erreur lors de l'archivage journalier:", error);
                     showToast(error.message || 'Erreur lors de l\'archivage.', 'error');
                 }
             }
@@ -2590,20 +2312,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!confirmArchive) return;
 
             const wishBackup = confirm('Voulez-vous télécharger une sauvegarde (.json) avant la réinitialisation ?');
-            if (wishBackup && typeof btnExportDb !== 'undefined' && btnExportDb) {
-                btnExportDb.click();
-            }
+            if (wishBackup && typeof btnExportDb !== 'undefined' && btnExportDb) { btnExportDb.click(); }
 
             try {
                 showToast("Archivage en cours, veuillez patienter...", "info");
-                const res = await fetch(`${API.stats}?action=archive_cycle`, { method: 'POST' });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Erreur lors de l'archivage du cycle.");
-
-                await loadState();
+                await statsService.archiveCycle(state.cycleDepots, state.cycleRetraits);
                 showToast('Nouveau cycle démarré avec succès. Historique sauvegardé !', 'success');
             } catch (error) {
-                console.error("Erreur lors de la réinitialisation du cycle:", error);
                 showToast(error.message || "Erreur lors de l'archivage.", "error");
             }
         });
@@ -2618,14 +2333,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (doubleConfirm) {
                 try {
                     showToast("Suppression des données en cours, veuillez patienter...", "info");
-                    const res = await fetch(`${API.stats}?action=reset_app`, { method: 'POST' });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || "Erreur lors de la réinitialisation.");
-
-                    await loadState();
+                    await statsService.resetApp();
                     showToast("Toutes les données ont été réinitialisées avec succès.", "success");
                 } catch (err) {
-                    console.error("Erreur réinitialisation :", err);
                     showToast(err.message || "Erreur de réinitialisation.", "error");
                 }
             }
@@ -2639,13 +2349,7 @@ document.addEventListener('DOMContentLoaded', () => {
         textarea.addEventListener('change', async (e) => {
             const newReglements = e.target.value;
             state.reglements = newReglements;
-            try {
-                await fetch(`${API.stats}?action=update_reglements`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ reglements: newReglements })
-                });
-            } catch (err) { }
+            try { await statsService.updateReglements(newReglements); } catch (err) {}
         });
     }
 
@@ -2657,18 +2361,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const notifsArr = getNotificationsArray(currentUser.notifications);
                 notifsArr.forEach(n => n.read = true);
                 currentUser.notifications = notifsArr;
-                try {
-                    const res = await fetch(`${API.members}?action=mark_read`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: currentUser.id })
-                    });
-                    const data = await res.json();
-                    if (data && data.notifications) {
-                        currentUser.notifications = data.notifications;
-                        saveActiveSession(currentUser);
-                    }
-                } catch (e) { }
+                try { await membersService.markNotifsRead(currentUser.id, notifsArr); } catch (e) {}
                 renderAll();
                 showToast("Toutes vos notifications ont été marquées comme lues.", "success");
             }
@@ -2774,27 +2467,31 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const res = await fetch(`${API.auth}?action=signup`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password, nom, parts: 1 })
+                // Créer dans Firebase Auth + Firestore avec status active et role admin_second
+                const cred = await firebase.auth().createUserWithEmailAndPassword(email.trim().toLowerCase(), password);
+                const uid = cred.user.uid;
+                await db.collection('members').doc(uid).set({
+                    nom: nom.trim(),
+                    email: email.trim().toLowerCase(),
+                    role: 'admin_second',
+                    status: 'active',
+                    parts: 1,
+                    totalDepot: 0,
+                    totalRetrait: 0,
+                    dateAjout: firebase.firestore.FieldValue.serverTimestamp(),
+                    notifications: [],
+                    profilePhoto: ''
                 });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Erreur lors de la création.");
-
-                if (data.user && data.user.id) {
-                    await fetch(`${API.members}?action=update_role`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: data.user.id, role: 'admin_second' })
-                    });
+                // Se reconnecter en tant qu'admin (la création a changé l'utilisateur connecté)
+                if (currentUser && currentUser.email) {
+                    showToast("Admin secondaire créé. Reconnectez-vous pour continuer.", "info");
+                    await performLogout();
+                } else {
+                    createSecAdminForm.reset();
+                    showToast("Administrateur secondaire créé avec succès.", "success");
                 }
-
-                await loadState();
-                createSecAdminForm.reset();
-                showToast("Administrateur secondaire créé avec succès.", "success");
             } catch (err) {
-                console.error("Erreur création admin secondaire :", err);
+                console.error("Erreur création admin secondaire:", err);
                 showToast(err.message || "Erreur lors de la création.", "error");
             }
         });
@@ -2804,9 +2501,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (changeCredentialsForm) {
         changeCredentialsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const emailInput = document.getElementById('change-email');
+            const currentPwdInput = document.getElementById('current-password') || document.getElementById('change-password-current');
             const passwordInput = document.getElementById('change-password');
-            const email = emailInput ? emailInput.value.trim() : '';
+            const currentPwd = currentPwdInput ? currentPwdInput.value : '';
             const newPassword = passwordInput ? passwordInput.value : '';
 
             if (!newPassword) {
@@ -2815,30 +2512,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const res = await fetch(`${API.auth}?action=change_password`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        id: currentUser ? currentUser.id : '',
-                        email: email,
-                        newPassword: newPassword
-                    })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Erreur lors de la modification du mot de passe.");
-
-                showToast(data.message || "Mot de passe mis à jour avec succès !", "success");
+                await authService.changePassword(currentPwd || newPassword, newPassword);
+                showToast("Mot de passe mis à jour avec succès !", "success");
                 if (passwordInput) passwordInput.value = '';
-
-                // Mettre à jour la session et l'état local en douceur sans réinitialiser l'écran de l'application
-                if (currentUser) {
-                    if (email) currentUser.email = email;
-                    saveActiveSession(currentUser);
-                }
-                await loadState();
-                renderAll();
+                if (currentPwdInput) currentPwdInput.value = '';
             } catch (err) {
-                console.error("Erreur modification mot de passe :", err);
+                console.error("Erreur modification mot de passe Firebase:", err);
                 showToast(err.message || "Erreur lors de la modification.", "error");
             }
         });
@@ -2959,19 +2638,53 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast("ZUBIKS SERVICE est installé sous forme d'application ! 📲", "success");
     });
 
-    // Initialize
-    const initializeAppUi = () => {
-        // Fonctions d'initialisation de l'interface
-    };
-
-    let initDone = false;
-    const finishInit = () => {
-        if (initDone) return;
-        initDone = true;
-        checkAndRestoreSession();
-        initializeAppUi();
-        setupListeners();
-    };
-
-    loadState().then(finishInit).catch(finishInit);
+    // Initialize — Firebase Auth état persiste automatiquement
+    auth.onAuthStateChanged(async (firebaseUser) => {
+        if (firebaseUser) {
+            // Utilisateur déjà connecté (session persistée par Firebase)
+            try {
+                const memberSnap = await db.collection('members').doc(firebaseUser.uid).get();
+                if (memberSnap.exists) {
+                    const userData = { id: firebaseUser.uid, ...memberSnap.data() };
+                    if (userData.status === 'pending') {
+                        // Compte en attente : déconnecter et afficher login
+                        await authService.logout();
+                        const splashScreen = document.getElementById('splash-screen');
+                        if (splashScreen) { splashScreen.style.opacity = '0'; setTimeout(() => { splashScreen.classList.remove('active'); splashScreen.style.display = 'none'; }, 300); }
+                        if (loginScreen) loginScreen.classList.add('active');
+                        if (dashboardScreen) dashboardScreen.classList.remove('active');
+                        showToast('Votre compte est en attente de validation par l\'administrateur.', 'warning');
+                        return;
+                    }
+                    currentUser = userData;
+                    saveActiveSession(currentUser);
+                    switchRoleView();
+                    if (loginScreen) loginScreen.classList.remove('active');
+                    if (dashboardScreen) dashboardScreen.classList.add('active');
+                    updateDates();
+                    teardownRealtimeListeners();
+                    setupRealtimeListeners();
+                    checkUrlResetToken();
+                } else {
+                    // Pas de document Firestore → déconnecter
+                    await authService.logout();
+                }
+            } catch (err) {
+                console.error('[Init] Erreur restauration session Firebase:', err);
+            } finally {
+                const splashScreen = document.getElementById('splash-screen');
+                if (splashScreen) { splashScreen.style.opacity = '0'; setTimeout(() => { splashScreen.classList.remove('active'); splashScreen.style.display = 'none'; }, 300); }
+            }
+        } else {
+            // Pas connecté
+            currentUser = null;
+            teardownRealtimeListeners();
+            saveActiveSession(null);
+            if (loginScreen) loginScreen.classList.add('active');
+            if (dashboardScreen) dashboardScreen.classList.remove('active');
+            const splashScreen = document.getElementById('splash-screen');
+            if (splashScreen) { splashScreen.style.opacity = '0'; setTimeout(() => { splashScreen.classList.remove('active'); splashScreen.style.display = 'none'; }, 300); }
+            checkUrlResetToken();
+        }
+    });
 });

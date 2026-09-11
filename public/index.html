@@ -1737,7 +1737,20 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-    <script src="app.js?v=8"></script>
+    <!-- ====================================================== -->
+    <!-- Firebase SDK (Compat v9 — accessible via firebase.*) -->
+    <!-- ====================================================== -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
+
+    <!-- Config + Service Firebase (doit être chargé AVANT app.js) -->
+    <script src="firebase-config.js?v=1"></script>
+    <script src="firebase-service.js?v=1"></script>
+
+    <!-- Application principale -->
+    <script src="app.js?v=9"></script>
     <!-- PWA Install Banner (PC, Android, iOS) -->
     <div id="pwa-install-banner" class="pwa-banner" style="display: none;">
         <div class="pwa-banner-content">
