@@ -1,5 +1,7 @@
 -- ZUBIKS SERVICES DATABASE EXPORT FOR PRODUCTION DEPLOYMENT
 -- Created at: 2026-09-09 23:35:07
+-- Sélection automatique de la base de données (InfinityFree)
+USE `if0_42877205_zubiks`;
 SET FOREIGN_KEY_CHECKS=0;
 
 DROP TABLE IF EXISTS `global_stats`;
