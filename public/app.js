@@ -562,44 +562,94 @@ document.addEventListener('DOMContentLoaded', () => {
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const nom = document.getElementById('reg-nom').value.trim();
-            const postnom = document.getElementById('reg-postnom').value.trim();
+            const postnom = (document.getElementById('reg-postnom').value || '').trim();
             const sexe = document.getElementById('reg-sexe').value;
             const email = document.getElementById('reg-email').value.trim().toLowerCase();
             const password = document.getElementById('reg-password').value;
 
-            if (!nom || !email || !password) {
-                showToast("Veuillez remplir tous les champs obligatoires.", "error");
+            // Validation côté client
+            if (!nom) {
+                showToast("⚠️ Veuillez saisir votre nom.", "error");
+                return;
+            }
+            if (!email) {
+                showToast("⚠️ Veuillez saisir votre adresse email.", "error");
+                return;
+            }
+            // Validation format email
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showToast("⚠️ Adresse email invalide. Ex: nom@exemple.com", "error");
+                return;
+            }
+            if (!password) {
+                showToast("⚠️ Veuillez saisir un mot de passe.", "error");
+                return;
+            }
+            if (password.length < 6) {
+                showToast("⚠️ Le mot de passe doit contenir au moins 6 caractères.", "error");
                 return;
             }
 
             const submitBtn = registerForm.querySelector('button[type="submit"]');
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '⏳ Inscription...'; }
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '⏳ Inscription en cours...'; }
 
             try {
-                await authService.register(nom, postnom, sexe, email, password);
+                const userData = await authService.register(nom, postnom, sexe, email, password);
 
                 // Notification EmailJS au nouvel inscrit et à l'admin
                 if (window.emailjs) {
                     const sId = window.EMAILJS_SERVICE_ID || 'service_pbpkjea';
                     const tId = window.EMAILJS_TEMPLATE_ID || 'template_2qjiyse';
                     const adminEmail = (state && state.credentials && state.credentials.email) ? state.credentials.email : 'zubiksservice@gmail.com';
-                    emailjs.send(sId, tId, { to_email: email, message: `Bienvenue chez ZUBIKS SERVICE ! Votre compte (${email}) a été créé. En attente de validation.` }).catch(() => {});
+                    emailjs.send(sId, tId, { to_email: email, message: `Bienvenue chez ZUBIKS SERVICE ! Votre compte (${email}) a été créé. En attente de validation des parts.` }).catch(() => {});
                     emailjs.send(sId, tId, { to_email: adminEmail, message: `📢 NOUVEAU MEMBRE : ${nom} ${postnom} (${email}) vient de s'inscrire. Validez son profil.` }).catch(() => {});
                 }
 
                 registerForm.reset();
-                showToast("Inscription réussie ! Votre compte est en attente de validation.", "success");
-                if (btnShowLogin) btnShowLogin.click();
-                const loginEmailInput = document.getElementById('email');
-                if (loginEmailInput) loginEmailInput.value = email;
+                currentUser = userData;
+                saveActiveSession(currentUser);
+                switchRoleView();
+                loginScreen.classList.remove('active');
+                dashboardScreen.classList.add('active');
+                updateDates();
+                teardownRealtimeListeners();
+                setupRealtimeListeners();
+                showToast(`✅ Inscription réussie ! Bienvenue ${currentUser.nom || 'Membre'}, vous avez accès à votre espace en attente de la validation de vos parts.`, "success");
+
             } catch (err) {
                 console.error("Erreur inscription Firebase:", err);
-                showToast(err.message || "Erreur lors de l'inscription.", "error");
+
+                // Traduction complète des erreurs Firebase en français
+                let msg = "❌ Une erreur est survenue lors de l'inscription. Veuillez réessayer.";
+                const code = err.code || '';
+
+                if (code === 'auth/email-already-in-use')
+                    msg = "❌ Cet email est déjà enregistré. Connectez-vous avec votre mot de passe, ou cliquez sur 'Mot de passe oublié ?' pour en définir un nouveau.";
+                else if (code === 'auth/invalid-email')
+                    msg = "❌ Adresse email invalide. Vérifiez le format (ex: nom@exemple.com).";
+                else if (code === 'auth/missing-email')
+                    msg = "❌ Veuillez saisir une adresse email valide.";
+                else if (code === 'auth/weak-password' || code === 'auth/missing-password')
+                    msg = "❌ Mot de passe trop faible. Utilisez au moins 6 caractères.";
+                else if (code === 'auth/network-request-failed')
+                    msg = "❌ Pas de connexion internet. Vérifiez votre réseau et réessayez.";
+                else if (code === 'auth/too-many-requests')
+                    msg = "❌ Trop de tentatives. Attendez quelques minutes avant de réessayer.";
+                else if (code === 'auth/operation-not-allowed')
+                    msg = "❌ Inscription désactivée temporairement. Contactez l'administrateur.";
+                else if (err.message && err.message.includes('PERMISSION_DENIED'))
+                    msg = "❌ Erreur de permissions. Contactez l'administrateur.";
+                else if (err.message && err.message.includes('Missing'))
+                    msg = "❌ Un champ requis est manquant. Vérifiez tous les champs du formulaire.";
+
+                showToast(msg, "error");
             } finally {
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = "S'inscrire"; }
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = "<span>S'inscrire</span><span class='arrow'>→</span>"; }
             }
         });
     }
+
 
     // Formulaire de Connexion (Firebase Auth)
     loginForm.addEventListener('submit', async (e) => {
@@ -748,8 +798,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (userNavGroup) userNavGroup.style.display = 'flex';
 
             if (userRoleBadge) {
-                userRoleBadge.textContent = "Membre ZUBIKS";
-                userRoleBadge.style.background = "var(--accent-color)";
+                if (currentUser.status === 'pending') {
+                    userRoleBadge.textContent = "En attente de validation";
+                    userRoleBadge.style.background = "#dd6b20";
+                } else {
+                    userRoleBadge.textContent = "Membre ZUBIKS";
+                    userRoleBadge.style.background = "var(--accent-color)";
+                }
             }
             if (loggedUserName) loggedUserName.textContent = currentUser.nom || "Membre";
             updateHeaderAvatar(currentUser);
@@ -1438,6 +1493,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            const userRoleBadge = document.getElementById('user-role-badge');
+            if (userRoleBadge) {
+                if (currentUser.status === 'pending') {
+                    userRoleBadge.textContent = "En attente de validation";
+                    userRoleBadge.style.background = "#dd6b20";
+                } else {
+                    userRoleBadge.textContent = "Membre ZUBIKS";
+                    userRoleBadge.style.background = "var(--accent-color)";
+                }
+            }
+
             // User Personal Transactions Table
             const userTxTableBody = document.querySelector('#user-transactions-table tbody');
             if (userTxTableBody) {
@@ -1794,7 +1860,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (chatHeaderName) chatHeaderName.textContent = selectedMember.nom;
                 if (chatHeaderInfo) chatHeaderInfo.textContent = `${selectedMember.parts || 0} part(s) • ${selectedMember.email || 'Email non spécifié'}`;
                 if (chatHeaderAvatar) chatHeaderAvatar.textContent = (selectedMember.nom || 'M').charAt(0).toUpperCase();
-                if (chatInput) chatInput.disabled = false;
+                if (chatInput) {
+                    chatInput.disabled = false;
+                    chatInput.placeholder = `Écrivez votre message à ${selectedMember.nom}...`;
+                }
                 if (chatSendBtn) chatSendBtn.disabled = false;
 
                 const memberMsgs = allMsgs.filter(msg => String(msg.memberId) === String(selectedMember.id) || (msg.memberId && selectedMember.nom && String(msg.memberId).trim().toLowerCase() === String(selectedMember.nom).trim().toLowerCase()) || (msg.senderName && selectedMember.nom && String(msg.senderName).trim().toLowerCase() === String(selectedMember.nom).trim().toLowerCase() && msg.sender === 'user'));
@@ -1817,7 +1886,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             `;
                             adminChatMessages.appendChild(bubble);
                         });
-                        setTimeout(() => { adminChatMessages.scrollTop = adminChatMessages.scrollHeight; }, 50);
+                        setTimeout(() => { 
+                            if (adminChatMessages) adminChatMessages.scrollTop = adminChatMessages.scrollHeight; 
+                        }, 50);
                     } else {
                         adminChatMessages.innerHTML = '<div class="empty-chat-placeholder"><div class="empty-chat-icon">💬</div><p>Écrivez ci-dessous pour démarrer la discussion avec ce membre.</p></div>';
                     }
@@ -1826,7 +1897,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (chatHeaderName) chatHeaderName.textContent = 'Sélectionnez un membre';
                 if (chatHeaderInfo) chatHeaderInfo.textContent = 'Choisissez une conversation dans la liste pour lire et répondre.';
                 if (chatHeaderAvatar) chatHeaderAvatar.textContent = '👤';
-                if (chatInput) chatInput.disabled = true;
+                if (chatInput) {
+                    chatInput.disabled = true;
+                    chatInput.placeholder = "Sélectionnez d'abord un membre pour lui écrire...";
+                }
                 if (chatSendBtn) chatSendBtn.disabled = true;
                 if (adminChatMessages) adminChatMessages.innerHTML = '<div class="empty-chat-placeholder"><div class="empty-chat-icon">👈</div><p>Sélectionnez une conversation dans la liste de gauche pour afficher les messages.</p></div>';
             }
@@ -2058,9 +2132,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const parts = Math.max(1, (member.parts || 1));
                 const minSingleDepot = 1000;
                 const maxTotalDepot = parts * 63000;
-                const minSingleRetrait = 62000; // Minimum fixe de 62 000 Fc peu importe le nombre de parts
+                const minSingleRetrait = 62000;
                 const maxTotalRetrait = parts * 62000;
-                const soldeDisponible = (member.totalDepot || 0) - (member.totalRetrait || 0);
 
                 if (currentOperationType === 'depot') {
                     if (amount < minSingleDepot) {
@@ -2069,7 +2142,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     if ((member.totalDepot + amount) > maxTotalDepot) {
                         const reste = Math.max(0, maxTotalDepot - member.totalDepot);
-                        showToast(`Dépôt refusé : Pour ${parts} part(s), le cumul maximal de dépôt pour un cycle (63 jours) est de ${maxTotalDepot.toLocaleString('fr-FR')} Fc. Reste autorisé : ${reste.toLocaleString('fr-FR')} Fc.`, 'error');
+                        showToast(`Dépôt refusé : Pour ${parts} part(s), le cumul maximal est de ${maxTotalDepot.toLocaleString('fr-FR')} Fc. Reste autorisé : ${reste.toLocaleString('fr-FR')} Fc.`, 'error');
                         return;
                     }
                 } else if (currentOperationType === 'retrait') {
@@ -2079,15 +2152,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     if ((member.totalRetrait + amount) > maxTotalRetrait) {
                         const reste = Math.max(0, maxTotalRetrait - member.totalRetrait);
-                        showToast(`Retrait refusé : Pour ${parts} part(s), le plafond maximal cumulé de retrait est de ${maxTotalRetrait.toLocaleString('fr-FR')} Fc. Reste autorisé : ${reste.toLocaleString('fr-FR')} Fc.`, 'error');
+                        showToast(`Retrait refusé : Pour ${parts} part(s), le plafond maximal est de ${maxTotalRetrait.toLocaleString('fr-FR')} Fc. Reste autorisé : ${reste.toLocaleString('fr-FR')} Fc.`, 'error');
                         return;
                     }
                 }
 
-                // Confirmation insistante
-                const isConfirmed = confirm(`Voulez-vous vraiment confirmer le ${typeName} de ${amount.toLocaleString('fr-FR')} Fc pour le membre ${member.nom} le ${new Date(opDate).toLocaleDateString('fr-FR')} ?\n\nCette action mettra à jour le solde.`);
+                // Confirmation
+                const isConfirmed = confirm(`Voulez-vous vraiment confirmer le ${typeName} de ${amount.toLocaleString('fr-FR')} Fc pour ${member.nom} ?`);
 
                 if (isConfirmed) {
+                    // ✅ FERMER LA MODAL IMMÉDIATEMENT — l'écriture Firestore se fait en arrière-plan
+                    operationModal.classList.remove('active');
+                    showToast(`⏳ Enregistrement du ${typeName}...`, 'info');
+
                     try {
                         await transactionsService.add(
                             member.id,
@@ -2099,8 +2176,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (notifChannel) {
                             notifChannel.postMessage({ type: 'NEW_TRANSACTION', memberId: member.id, memberNom: member.nom });
                         }
-                        operationModal.classList.remove('active');
-                        showToast(`Le ${typeName} de ${amount.toLocaleString('fr-FR')} Fc (Cash) a été enregistré.`, 'success');
+                        showToast(`✅ ${typeName.charAt(0).toUpperCase() + typeName.slice(1)} de ${amount.toLocaleString('fr-FR')} Fc enregistré avec succès !`, 'success');
                     } catch (error) {
                         console.error("Erreur lors de l'opération Firebase:", error);
                         showToast(error.message || "Erreur lors de l'enregistrement de l'opération.", "error");
@@ -2111,6 +2187,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('Veuillez entrer un montant valide supérieur à 0.', 'error');
         }
     });
+
 
     // --- Member Edit, Delete & Details ---
     window.deleteSecAdmin = async (id) => {
@@ -2330,19 +2407,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetDatabaseBtn = document.getElementById('reset-database-btn');
     if (resetDatabaseBtn) {
         resetDatabaseBtn.addEventListener('click', async () => {
-            const doubleConfirm = confirm("⚠️ ATTENTION : Êtes-vous sûr de vouloir réinitialiser COMPLÈTEMENT toutes les données ?\n\nCette action supprimera définitivement tous les membres, les transactions et tous les historiques d'archives.");
+            const doubleConfirm = confirm(
+                "⚠️ RÉINITIALISATION COMPLÈTE\n\n" +
+                "Cette action va :\n" +
+                "• Supprimer tous les membres (sauf admin)\n" +
+                "• Supprimer toutes les transactions\n" +
+                "• Supprimer tous les messages et archives\n" +
+                "• Remettre les compteurs à zéro\n\n" +
+                "Les membres pourront se réinscrire avec leurs mêmes emails.\n\n" +
+                "❓ Êtes-vous absolument sûr de vouloir continuer ?"
+            );
 
             if (doubleConfirm) {
+                const submitBtn = resetDatabaseBtn;
+                const originalText = submitBtn ? submitBtn.innerHTML : '';
+                if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '⏳ Réinitialisation...'; }
+
                 try {
-                    showToast("Suppression des données en cours, veuillez patienter...", "info");
+                    showToast("🔄 Suppression des données en cours...", "info");
                     await statsService.resetApp();
-                    showToast("Toutes les données ont été réinitialisées avec succès.", "success");
+                    
+                    showToast("✅ Toutes les données ont été réinitialisées avec succès.", "success");
+                    
+                    setTimeout(() => {
+                        alert(
+                            "✅ Réinitialisation terminée !\n\n" +
+                            "Les membres ont été supprimés de la base de données. " +
+                            "Ils peuvent maintenant utiliser le bouton 'S'inscrire' avec leurs anciens emails pour créer un nouveau profil."
+                        );
+                    }, 500);
+                    
                 } catch (err) {
+                    console.error("Erreur réinitialisation:", err);
                     showToast(err.message || "Erreur de réinitialisation.", "error");
+                } finally {
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalText; }
                 }
             }
         });
     }
+
 
     // --- Textarea Save logic (A propos) ---
     const textarea = document.querySelector('.modern-textarea');
@@ -2503,27 +2607,137 @@ document.addEventListener('DOMContentLoaded', () => {
     if (changeCredentialsForm) {
         changeCredentialsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const currentPwdInput = document.getElementById('current-password') || document.getElementById('change-password-current');
+            // Le champ dédié "mot de passe actuel" (obligatoire pour Firebase re-auth)
+            const currentPwdInput = document.getElementById('current-password-admin');
             const passwordInput = document.getElementById('change-password');
-            const currentPwd = currentPwdInput ? currentPwdInput.value : '';
-            const newPassword = passwordInput ? passwordInput.value : '';
+            const currentPwd = currentPwdInput ? currentPwdInput.value.trim() : '';
+            const newPassword = passwordInput ? passwordInput.value.trim() : '';
 
-            if (!newPassword) {
-                showToast("Veuillez saisir un nouveau mot de passe.", "error");
+            if (!currentPwd) {
+                showToast("Veuillez saisir votre mot de passe actuel.", "error");
+                return;
+            }
+            if (!newPassword || newPassword.length < 6) {
+                showToast("Le nouveau mot de passe doit contenir au moins 6 caractères.", "error");
                 return;
             }
 
+            const submitBtn = changeCredentialsForm.querySelector('button[type="submit"]');
+            const originalText = submitBtn ? submitBtn.innerHTML : '';
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '⏳ Mise à jour...'; }
+
             try {
-                await authService.changePassword(currentPwd || newPassword, newPassword);
-                showToast("Mot de passe mis à jour avec succès !", "success");
+                await authService.changePassword(currentPwd, newPassword);
+                showToast("✅ Mot de passe mis à jour avec succès !", "success");
                 if (passwordInput) passwordInput.value = '';
                 if (currentPwdInput) currentPwdInput.value = '';
             } catch (err) {
                 console.error("Erreur modification mot de passe Firebase:", err);
-                showToast(err.message || "Erreur lors de la modification.", "error");
+                let msg = err.message || "Erreur lors de la modification.";
+                if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = "❌ Mot de passe actuel incorrect.";
+                if (err.code === 'auth/weak-password') msg = "❌ Le nouveau mot de passe est trop faible (min. 6 caractères).";
+                if (err.code === 'auth/requires-recent-login') msg = "❌ Session expirée. Déconnectez-vous et reconnectez-vous avant de changer le mot de passe.";
+                showToast(msg, "error");
+            } finally {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalText; }
             }
         });
     }
+
+    // =====================================================
+    // PARAMÈTRES DU COMPTE MEMBRE — Modifier infos
+    // =====================================================
+    const userUpdateInfoForm = document.getElementById('user-update-info-form');
+    if (userUpdateInfoForm) {
+        // Pré-remplir les champs au clic sur l'onglet Paramètres
+        const paramBtn = document.querySelector('[data-target="tab-user-parametres"]');
+        if (paramBtn) {
+            paramBtn.addEventListener('click', () => {
+                const nomInput = document.getElementById('user-param-nom');
+                const postnomInput = document.getElementById('user-param-postnom');
+                const emailInput = document.getElementById('user-param-email');
+                if (currentUser) {
+                    if (nomInput) nomInput.value = currentUser.nom || '';
+                    if (postnomInput) postnomInput.value = currentUser.postnom || '';
+                    if (emailInput) emailInput.value = currentUser.email || '';
+                }
+            });
+        }
+
+        userUpdateInfoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nom = (document.getElementById('user-param-nom').value || '').trim();
+            const postnom = (document.getElementById('user-param-postnom').value || '').trim();
+
+            if (!nom) {
+                showToast("Le nom est obligatoire.", "error");
+                return;
+            }
+
+            const submitBtn = userUpdateInfoForm.querySelector('button[type="submit"]');
+            const originalText = submitBtn ? submitBtn.innerHTML : '';
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '⏳ Enregistrement...'; }
+
+            try {
+                await membersService.update(currentUser.id, nom, currentUser.parts || 1, postnom, currentUser.sexe);
+                currentUser.nom = nom;
+                currentUser.postnom = postnom;
+                saveActiveSession(currentUser);
+                showToast("✅ Informations mises à jour avec succès !", "success");
+            } catch (err) {
+                console.error("Erreur mise à jour infos membre:", err);
+                showToast(err.message || "Erreur lors de la mise à jour.", "error");
+            } finally {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalText; }
+            }
+        });
+    }
+
+    // =====================================================
+    // PARAMÈTRES DU COMPTE MEMBRE — Changer mot de passe
+    // =====================================================
+    const userChangePwdForm = document.getElementById('user-change-password-form');
+    if (userChangePwdForm) {
+        userChangePwdForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const currentPwd = (document.getElementById('user-current-password').value || '').trim();
+            const newPwd = (document.getElementById('user-new-password').value || '').trim();
+            const confirmPwd = (document.getElementById('user-confirm-password').value || '').trim();
+
+            if (!currentPwd) {
+                showToast("Veuillez saisir votre mot de passe actuel.", "error");
+                return;
+            }
+            if (!newPwd || newPwd.length < 6) {
+                showToast("Le nouveau mot de passe doit contenir au moins 6 caractères.", "error");
+                return;
+            }
+            if (newPwd !== confirmPwd) {
+                showToast("❌ Les deux mots de passe ne correspondent pas.", "error");
+                return;
+            }
+
+            const submitBtn = userChangePwdForm.querySelector('button[type="submit"]');
+            const originalText = submitBtn ? submitBtn.innerHTML : '';
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '⏳ Mise à jour...'; }
+
+            try {
+                await authService.changePassword(currentPwd, newPwd);
+                showToast("✅ Mot de passe changé avec succès !", "success");
+                userChangePwdForm.reset();
+            } catch (err) {
+                console.error("Erreur changement mot de passe membre:", err);
+                let msg = err.message || "Erreur lors du changement.";
+                if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = "❌ Mot de passe actuel incorrect.";
+                if (err.code === 'auth/weak-password') msg = "❌ Nouveau mot de passe trop faible (min. 6 caractères).";
+                if (err.code === 'auth/requires-recent-login') msg = "❌ Session expirée. Déconnectez-vous et reconnectez-vous.";
+                showToast(msg, "error");
+            } finally {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalText; }
+            }
+        });
+    }
+
 
     // =========================================
     // --- PWA Installation Experience Handler ---
@@ -2644,20 +2858,13 @@ document.addEventListener('DOMContentLoaded', () => {
     auth.onAuthStateChanged(async (firebaseUser) => {
         if (firebaseUser) {
             // Utilisateur déjà connecté (session persistée par Firebase)
+            // ⚠️ On force la lecture depuis le SERVEUR pour bypasser le cache SDK
+            // Cela évite que le statut 'pending' soit lu depuis le cache local
+            // alors que l'admin vient de valider le compte
             try {
-                const memberSnap = await db.collection('members').doc(firebaseUser.uid).get();
+                const memberSnap = await db.collection('members').doc(firebaseUser.uid).get({ source: 'server' });
                 if (memberSnap.exists) {
                     const userData = { id: firebaseUser.uid, ...memberSnap.data() };
-                    if (userData.status === 'pending') {
-                        // Compte en attente : déconnecter et afficher login
-                        await authService.logout();
-                        const splashScreen = document.getElementById('splash-screen');
-                        if (splashScreen) { splashScreen.style.opacity = '0'; setTimeout(() => { splashScreen.classList.remove('active'); splashScreen.style.display = 'none'; }, 300); }
-                        if (loginScreen) loginScreen.classList.add('active');
-                        if (dashboardScreen) dashboardScreen.classList.remove('active');
-                        showToast('Votre compte est en attente de validation par l\'administrateur.', 'warning');
-                        return;
-                    }
                     currentUser = userData;
                     saveActiveSession(currentUser);
                     switchRoleView();
@@ -2673,6 +2880,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (err) {
                 console.error('[Init] Erreur restauration session Firebase:', err);
+                // En cas d'erreur réseau (offline), on essaie sans forcer le serveur
+                try {
+                    const memberSnapFallback = await db.collection('members').doc(firebaseUser.uid).get();
+                    if (memberSnapFallback.exists) {
+                        const userData = { id: firebaseUser.uid, ...memberSnapFallback.data() };
+                        currentUser = userData;
+                        saveActiveSession(currentUser);
+                        switchRoleView();
+                        if (loginScreen) loginScreen.classList.remove('active');
+                        if (dashboardScreen) dashboardScreen.classList.add('active');
+                        updateDates();
+                        teardownRealtimeListeners();
+                        setupRealtimeListeners();
+                    } else {
+                        await authService.logout();
+                    }
+                } catch (fallbackErr) {
+                    console.error('[Init] Erreur fallback session:', fallbackErr);
+                }
             } finally {
                 const splashScreen = document.getElementById('splash-screen');
                 if (splashScreen) { splashScreen.style.opacity = '0'; setTimeout(() => { splashScreen.classList.remove('active'); splashScreen.style.display = 'none'; }, 300); }

@@ -401,6 +401,9 @@
                         <span class="icon">🔔</span> Notifications <span id="unread-notif-badge" class="badge"
                             style="background: var(--danger); color: white; border-radius: 10px; padding: 2px 6px; font-size: 0.75rem; display: none;">0</span>
                     </button>
+                    <button class="nav-btn" data-target="tab-user-parametres">
+                        <span class="icon">⚙️</span> Paramètres du Compte
+                    </button>
                     <button class="nav-btn" data-target="tab-apropos">
                         <span class="icon">ℹ️</span> A Propos & Règlements
                     </button>
@@ -670,6 +673,79 @@
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Tab Paramètres du Compte Membre -->
+                <div id="tab-user-parametres" class="tab-pane fade-in">
+                    <div style="display: flex; flex-direction: column; gap: 24px;">
+
+                        <!-- Bloc: Modifier les informations -->
+                        <div class="panel glass-panel" style="padding: 28px; border-radius: 16px; border: 1px solid rgba(0,0,0,0.06);">
+                            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 22px;">
+                                <div style="background: rgba(59,130,246,0.1); padding: 12px; border-radius: 12px; color: #3b82f6; font-size: 1.4rem;">👤</div>
+                                <div>
+                                    <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; color: #1e293b; margin: 0;">Mes Informations</h3>
+                                    <p style="font-family: 'Inter', sans-serif; font-size: 0.85rem; color: #64748b; margin: 3px 0 0 0;">Mettez à jour votre nom et prénom.</p>
+                                </div>
+                            </div>
+                            <form id="user-update-info-form">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                                    <div class="form-group">
+                                        <label for="user-param-nom" style="font-family:'Inter',sans-serif; font-weight:500; font-size:0.9rem; color:#475569;">Nom <span style="color:#ef4444;">*</span></label>
+                                        <input type="text" id="user-param-nom" required placeholder="Votre nom"
+                                            class="large-input" style="padding:12px; border-radius:10px; border:1px solid #cbd5e1; font-size:0.95rem; width:100%; box-sizing:border-box;">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="user-param-postnom" style="font-family:'Inter',sans-serif; font-weight:500; font-size:0.9rem; color:#475569;">Postnom</label>
+                                        <input type="text" id="user-param-postnom" placeholder="Votre postnom"
+                                            class="large-input" style="padding:12px; border-radius:10px; border:1px solid #cbd5e1; font-size:0.95rem; width:100%; box-sizing:border-box;">
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 20px;">
+                                    <label for="user-param-email" style="font-family:'Inter',sans-serif; font-weight:500; font-size:0.9rem; color:#64748b;">Adresse Email (non modifiable)</label>
+                                    <input type="email" id="user-param-email" readonly
+                                        class="large-input" style="padding:12px; border-radius:10px; border:1px solid #e2e8f0; background:#f1f5f9; color:#64748b; font-size:0.95rem; width:100%; box-sizing:border-box; cursor:not-allowed;">
+                                </div>
+                                <button type="submit" class="btn-primary w-100"
+                                    style="font-family:'Outfit',sans-serif; font-weight:600; padding:12px; font-size:1rem; border-radius:10px; background:#3b82f6; box-shadow:0 4px 14px rgba(59,130,246,0.3);">
+                                    💾 Enregistrer les modifications
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Bloc: Changer le mot de passe -->
+                        <div class="panel glass-panel" style="padding: 28px; border-radius: 16px; border: 1px solid rgba(0,0,0,0.06);">
+                            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 22px;">
+                                <div style="background: rgba(239,68,68,0.1); padding: 12px; border-radius: 12px; color: #ef4444; font-size: 1.4rem;">🔒</div>
+                                <div>
+                                    <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; color: #1e293b; margin: 0;">Sécurité — Mot de passe</h3>
+                                    <p style="font-family: 'Inter', sans-serif; font-size: 0.85rem; color: #64748b; margin: 3px 0 0 0;">Changez votre mot de passe de connexion.</p>
+                                </div>
+                            </div>
+                            <form id="user-change-password-form">
+                                <div class="form-group" style="margin-bottom: 16px;">
+                                    <label for="user-current-password" style="font-family:'Inter',sans-serif; font-weight:500; font-size:0.9rem; color:#475569;">Mot de passe actuel <span style="color:#ef4444;">*</span></label>
+                                    <input type="password" id="user-current-password" required placeholder="Votre mot de passe actuel"
+                                        class="large-input" style="padding:12px; border-radius:10px; border:1px solid #cbd5e1; font-size:0.95rem; width:100%; box-sizing:border-box;">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 16px;">
+                                    <label for="user-new-password" style="font-family:'Inter',sans-serif; font-weight:500; font-size:0.9rem; color:#475569;">Nouveau mot de passe <span style="color:#ef4444;">*</span></label>
+                                    <input type="password" id="user-new-password" required placeholder="Minimum 6 caractères"
+                                        class="large-input" style="padding:12px; border-radius:10px; border:1px solid #cbd5e1; font-size:0.95rem; width:100%; box-sizing:border-box;">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 22px;">
+                                    <label for="user-confirm-password" style="font-family:'Inter',sans-serif; font-weight:500; font-size:0.9rem; color:#475569;">Confirmer le nouveau mot de passe <span style="color:#ef4444;">*</span></label>
+                                    <input type="password" id="user-confirm-password" required placeholder="Répétez le nouveau mot de passe"
+                                        class="large-input" style="padding:12px; border-radius:10px; border:1px solid #cbd5e1; font-size:0.95rem; width:100%; box-sizing:border-box;">
+                                </div>
+                                <button type="submit" class="btn-danger w-100" id="user-change-pwd-btn"
+                                    style="font-family:'Outfit',sans-serif; font-weight:600; padding:12px; font-size:1rem; border-radius:10px; background:#ef4444; box-shadow:0 4px 14px rgba(239,68,68,0.3); border:none; color:white; cursor:pointer;">
+                                    🔑 Changer le mot de passe
+                                </button>
+                            </form>
+                        </div>
+
                     </div>
                 </div>
 
@@ -1362,22 +1438,28 @@
                                 <div class="form-group" style="margin-bottom: 20px;">
                                     <label for="change-email"
                                         style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.95rem; color: #475569;">Adresse
-                                        Email Actuelle</label>
-                                    <input type="text" inputmode="email" id="change-email" required
-                                        placeholder="Ex: admin@zubiks.com" class="large-input"
-                                        style="font-family: 'Inter', sans-serif; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 1rem;">
+                                        Email du compte</label>
+                                    <input type="text" inputmode="email" id="change-email" readonly
+                                        class="large-input"
+                                        style="font-family: 'Inter', sans-serif; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; background: #f1f5f9; font-size: 1rem; color: #64748b; cursor: not-allowed;">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 18px;">
+                                    <label for="current-password-admin"
+                                        style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.95rem; color: #475569;">Mot de passe actuel <span style="color:#ef4444;">*</span></label>
+                                    <input type="password" id="current-password-admin" required
+                                        placeholder="Votre mot de passe actuel" class="large-input"
+                                        style="font-family: 'Inter', sans-serif; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 1rem;">
                                 </div>
                                 <div class="form-group" style="margin-bottom: 25px;">
                                     <label for="change-password"
-                                        style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.95rem; color: #475569;">Nouveau
-                                        mot de passe</label>
+                                        style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.95rem; color: #475569;">Nouveau mot de passe <span style="color:#ef4444;">*</span></label>
                                     <input type="password" id="change-password" required
-                                        placeholder="Saisissez un mot de passe fort" class="large-input"
+                                        placeholder="Minimum 6 caractères" class="large-input"
                                         style="font-family: 'Inter', sans-serif; padding: 14px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 1rem;">
                                 </div>
                                 <button type="submit" class="btn-primary w-100"
                                     style="font-family: 'Outfit', sans-serif; font-weight: 600; padding: 14px; font-size: 1.05rem; border-radius: 10px; background: #3b82f6; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4); transition: all 0.2s;">
-                                    Mettre à jour les accès
+                                    🔒 Mettre à jour le mot de passe
                                 </button>
                             </form>
                         </div>

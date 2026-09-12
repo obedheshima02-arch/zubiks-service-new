@@ -1962,15 +1962,18 @@ button {
     padding: 0 !important;
     overflow: hidden !important;
     border-radius: 16px !important;
+    height: 100%;
 }
 
 .admin-chat-grid {
     display: grid;
     grid-template-columns: 320px 1fr;
-    min-height: 560px;
-    height: 600px;
+    grid-template-rows: 100%;
+    min-height: 520px;
+    height: clamp(520px, 70vh, 700px);
     width: 100%;
     box-sizing: border-box;
+    overflow: hidden;
 }
 
 /* Sidebar Threads Panel */
@@ -1982,7 +1985,9 @@ button {
     flex-direction: column;
     gap: 12px;
     height: 100%;
+    min-height: 0;
     box-sizing: border-box;
+    overflow: hidden;
 }
 
 .threads-header {
@@ -2172,15 +2177,21 @@ button {
     flex-direction: column;
     background: #ffffff;
     height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    box-sizing: border-box;
 }
 
 .chat-active-header {
+    flex-shrink: 0;
     padding: 14px 18px;
     border-bottom: 1px solid #e2e8f0;
     background: #f8fafc;
     display: flex;
     align-items: center;
     gap: 12px;
+    box-sizing: border-box;
 }
 
 .btn-chat-back {
@@ -2245,13 +2256,15 @@ button {
 }
 
 .chat-messages-body {
-    flex: 1;
+    flex: 1 1 0;
+    min-height: 0;
     padding: 20px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 12px;
     background: #f8fafc;
+    box-sizing: border-box;
 }
 
 .empty-chat-placeholder {
@@ -2327,11 +2340,14 @@ button {
 
 /* Chat Input Bar */
 .chat-input-bar {
+    flex-shrink: 0 !important;
     padding: 14px 18px;
     background: #ffffff;
     border-top: 1px solid #e2e8f0;
     width: 100%;
     box-sizing: border-box;
+    position: relative;
+    z-index: 5;
 }
 
 .chat-input-wrapper {
@@ -2438,6 +2454,7 @@ textarea.chat-input-field:focus,
 /* Media Queries for Mobile Screens */
 @media (max-width: 768px) {
     #tab-messagerie-admin .panel.glass-panel,
+    #tab-messagerie-user .panel.glass-panel,
     .admin-chat-panel-container {
         padding: 0 !important;
         margin: 0 !important;
@@ -2445,7 +2462,9 @@ textarea.chat-input-field:focus,
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
+        border: none !important;
     }
+
 
     .admin-chat-topbar {
         padding: 12px 14px !important;
@@ -2477,10 +2496,12 @@ textarea.chat-input-field:focus,
 
     .admin-chat-grid {
         grid-template-columns: 1fr !important;
-        height: 520px !important;
+        grid-template-rows: 100% !important;
+        height: clamp(460px, 75vh, 600px) !important;
         min-height: 440px !important;
         width: 100% !important;
         border-radius: 12px !important;
+        overflow: hidden !important;
     }
 
     /* Toggle view on mobile between thread sidebar and active chat panel */
@@ -2490,15 +2511,21 @@ textarea.chat-input-field:focus,
 
     .admin-chat-grid.mobile-chat-open .chat-active-panel {
         display: flex !important;
+        flex-direction: column !important;
         width: 100% !important;
         height: 100% !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
         border-radius: 12px !important;
     }
 
     .admin-chat-grid:not(.mobile-chat-open) .chat-threads-panel {
         display: flex !important;
+        flex-direction: column !important;
         width: 100% !important;
         height: 100% !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
         border-radius: 12px !important;
     }
 
@@ -2507,6 +2534,7 @@ textarea.chat-input-field:focus,
     }
 
     .chat-active-header {
+        flex-shrink: 0 !important;
         padding: 10px 12px !important;
         gap: 10px !important;
         width: 100% !important;
@@ -2525,15 +2553,24 @@ textarea.chat-input-field:focus,
         width: max-content !important;
     }
 
-    #user-chat-messages,
+    #user-chat-messages {
+        padding: 12px 10px !important;
+        width: 100% !important;
+        max-height: 50vh !important;
+    }
+
     #admin-chat-messages {
         padding: 12px 10px !important;
         width: 100% !important;
+        flex: 1 1 0 !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
     }
 
     .chat-input-bar {
         padding: 8px 10px !important;
         width: 100% !important;
+        flex-shrink: 0 !important;
     }
 
     .chat-input-wrapper {

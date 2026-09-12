@@ -16,3 +16,4 @@ Desktop.ini
 # Temp / Local config
 tmp/
 temp/
+node_modules

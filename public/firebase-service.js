@@ -45,12 +45,13 @@ const FirebaseService = (() => {
             const cred = await auth.signInWithEmailAndPassword(email.trim().toLowerCase(), password);
             const uid = cred.user.uid;
 
-            // Chercher le document du membre dans Firestore
-            let memberDoc = await db.collection('members').doc(uid).get();
+            // Forcer la lecture depuis le SERVEUR (bypass cache Firestore SDK)
+            // Indispensable pour détecter que le statut a changé de 'pending' → 'active'
+            let memberDoc = await db.collection('members').doc(uid).get({ source: 'server' });
 
             if (!memberDoc.exists) {
                 // Premier login admin : créer le document admin automatiquement
-                const statsDoc = await db.collection('global_stats').doc('main').get();
+                const statsDoc = await db.collection('global_stats').doc('main').get({ source: 'server' });
                 const adminEmail = statsDoc.exists ? (statsDoc.data().adminEmail || 'zubiksservice@gmail.com') : 'zubiksservice@gmail.com';
 
                 if (email.trim().toLowerCase() === adminEmail.toLowerCase()) {
@@ -67,20 +68,31 @@ const FirebaseService = (() => {
                         profilePhoto: ''
                     };
                     await db.collection('members').doc(uid).set(adminData);
-                    memberDoc = await db.collection('members').doc(uid).get();
+                    memberDoc = await db.collection('members').doc(uid).get({ source: 'server' });
                 } else {
-                    await auth.signOut();
-                    throw new Error('Compte non trouvé. Contactez l\'administrateur.');
+                    // L'utilisateur existe dans Firebase Auth mais son document Firestore a été supprimé lors de la réinitialisation
+                    const newMemberData = {
+                        nom: cred.user.displayName || email.split('@')[0],
+                        postnom: '',
+                        sexe: 'M',
+                        email: email.trim().toLowerCase(),
+                        role: 'user',
+                        status: 'pending',
+                        parts: 1,
+                        totalDepot: 0,
+                        totalRetrait: 0,
+                        dateAjout: new Date().toISOString(),
+                        notifications: [],
+                        profilePhoto: ''
+                    };
+                    await db.collection('members').doc(uid).set(newMemberData);
+                    return { id: uid, ...newMemberData };
                 }
             }
 
             const userData = docToObj(memberDoc);
 
-            if (userData.status === 'pending') {
-                await auth.signOut();
-                throw new Error('Votre compte est en attente de validation par l\'administrateur.');
-            }
-
+            // Permettre l'accès aux membres même avec le statut 'pending'
             return userData;
         },
 
@@ -88,7 +100,28 @@ const FirebaseService = (() => {
          * Inscription d'un nouveau membre (status: pending)
          */
         register: async (nom, postnom, sexe, email, password) => {
-            const cred = await auth.createUserWithEmailAndPassword(email.trim().toLowerCase(), password);
+            let cred = null;
+            let isRecreation = false;
+
+            try {
+                cred = await auth.createUserWithEmailAndPassword(email.trim().toLowerCase(), password);
+            } catch (authErr) {
+                // 💡 ASTUCE MAGIQUE (100% MOBILE) :
+                // Si l'email est déjà utilisé (souvent suite à une réinitialisation où on a supprimé
+                // le profil Firestore mais pas le compte Auth), on essaie de le connecter avec le mot de passe fourni.
+                if (authErr.code === 'auth/email-already-in-use') {
+                    try {
+                        cred = await auth.signInWithEmailAndPassword(email.trim().toLowerCase(), password);
+                        isRecreation = true; // Succès ! C'est un ancien compte, on va écraser/récréer son profil.
+                    } catch (signInErr) {
+                        // Le mot de passe est incorrect (soit c'est un vrai autre utilisateur, soit il a oublié son mdp)
+                        throw authErr;
+                    }
+                } else {
+                    throw authErr;
+                }
+            }
+
             const uid = cred.user.uid;
 
             const memberData = {
@@ -101,21 +134,31 @@ const FirebaseService = (() => {
                 parts: 1,
                 totalDepot: 0,
                 totalRetrait: 0,
-                dateAjout: serverTs(),
+                dateAjout: new Date().toISOString(), // ISO string pour éviter les pb de serverTimestamp offline
                 notifications: [],
                 profilePhoto: ''
             };
 
-            await db.collection('members').doc(uid).set(memberData);
+            try {
+                // Écrase ou crée le document dans Firestore
+                await db.collection('members').doc(uid).set(memberData);
+            } catch (firestoreErr) {
+                // Si l'écriture Firestore échoue et qu'on vient de le créer, on nettoie
+                if (!isRecreation) {
+                    try { await cred.user.delete(); } catch (e) {}
+                }
+                throw new Error("Erreur lors de l'enregistrement du profil. Vérifiez votre connexion et réessayez.");
+            }
 
-            // Firebase Auth envoie automatiquement l'email de vérification
-            try { await cred.user.sendEmailVerification(); } catch (e) {}
+            // Envoyer l'email de vérification seulement s'il est tout nouveau
+            if (!isRecreation) {
+                try { await cred.user.sendEmailVerification(); } catch (e) {}
+            }
 
-            // Déconnexion immédiate — doit être validé par admin avant accès
-            await auth.signOut();
-
-            return { id: uid, ...memberData };
+            // L'utilisateur reste connecté afin de pouvoir accéder directement à son interface (statut 'pending')
+            return { id: uid, ...memberData, isRecreation };
         },
+
 
         /**
          * Déconnexion
@@ -615,17 +658,38 @@ const FirebaseService = (() => {
 
         /**
          * Reset complet de l'application (admin uniquement)
+         * Supprime Firestore + stocke les UIDs pour suppression Auth via script admin
          */
         resetApp: async () => {
-            // Supprimer tous les membres (sauf admin)
+            // 1. Récupérer tous les membres non-admin à supprimer
             const membersSnap = await db.collection('members').get();
             const batch1 = db.batch();
+            const uidsToDelete = []; // UIDs Firebase Auth à supprimer
+
             membersSnap.forEach(d => {
-                if (d.data().role !== 'admin') batch1.delete(d.ref);
+                const data = d.data();
+                if (data.role !== 'admin') {
+                    batch1.delete(d.ref);
+                    // Stocker l'UID pour suppression Auth (seulement les membres avec un vrai UID Firebase Auth)
+                    // Les membres manuels (id commence par 'manual_') n'ont pas de compte Auth
+                    if (!d.id.startsWith('manual_')) {
+                        uidsToDelete.push({ uid: d.id, email: data.email || '', nom: data.nom || '' });
+                    }
+                }
             });
             await batch1.commit();
 
-            // Supprimer transactions, messages, archives
+            // 2. Stocker la liste des UIDs à supprimer dans Firestore pour le script admin
+            if (uidsToDelete.length > 0) {
+                const deletionRef = db.collection('pending_auth_deletions').doc('queue');
+                await deletionRef.set({
+                    uids: uidsToDelete,
+                    requestedAt: new Date().toISOString(),
+                    processed: false
+                });
+            }
+
+            // 3. Supprimer transactions, messages, archives
             const collections = ['transactions', 'messages', 'archives', 'daily_archives'];
             for (const col of collections) {
                 const snap = await db.collection(col).get();
@@ -634,13 +698,16 @@ const FirebaseService = (() => {
                 await batch.commit();
             }
 
-            // Reset global_stats
+            // 4. Reset global_stats
             await db.collection('global_stats').doc('main').update({
                 dailyDepots: 0, dailyRetraits: 0,
                 cycleDepots: 0, cycleRetraits: 0,
                 argentDebut: 0
             });
+
+            return { deletedAuthCount: uidsToDelete.length };
         }
+
     };
 
     // ─────────────────────────────────────────────────
